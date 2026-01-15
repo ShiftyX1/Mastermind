@@ -33,14 +33,54 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     const { session, desktopCapturer } = require('electron');
-    session.defaultSession.setDisplayMediaRequestHandler(
-        (request, callback) => {
-            desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
-            });
-        },
-        { useSystemPicker: true }
-    );
+    
+    // Store selected source for Windows custom picker
+    let selectedSourceId = null;
+    
+    // Setup display media handler based on platform
+    if (process.platform === 'darwin') {
+        // macOS: Use native system picker
+        session.defaultSession.setDisplayMediaRequestHandler(
+            (request, callback) => {
+                desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+                    callback({ video: sources[0], audio: 'loopback' });
+                });
+            },
+            { useSystemPicker: true }
+        );
+    } else {
+        // Windows/Linux: Use selected source from custom picker
+        session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+            try {
+                const sources = await desktopCapturer.getSources({
+                    types: ['screen', 'window'],
+                    thumbnailSize: { width: 0, height: 0 },
+                });
+
+                // Find the selected source or use first screen
+                let source = sources[0];
+                if (selectedSourceId) {
+                    const found = sources.find(s => s.id === selectedSourceId);
+                    if (found) source = found;
+                }
+
+                if (source) {
+                    callback({ video: source, audio: 'loopback' });
+                } else {
+                    callback({});
+                }
+            } catch (error) {
+                console.error('Error in display media handler:', error);
+                callback({});
+            }
+        });
+    }
+
+    // IPC handler to set selected source
+    ipcMain.handle('set-selected-source', async (event, sourceId) => {
+        selectedSourceId = sourceId;
+        return { success: true };
+    });
 
     mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
@@ -712,6 +752,29 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             if (!mainWindow.isDestroyed()) {
                 mainWindow.showInactive();
             }
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Get available screen sources for picker
+    ipcMain.handle('get-screen-sources', async () => {
+        try {
+            const { desktopCapturer } = require('electron');
+            const sources = await desktopCapturer.getSources({
+                types: ['screen', 'window'],
+                thumbnailSize: { width: 150, height: 150 },
+            });
+
+            return {
+                success: true,
+                sources: sources.map(source => ({
+                    id: source.id,
+                    name: source.name,
+                    thumbnail: source.thumbnail.toDataURL(),
+                })),
+            };
+        } catch (error) {
+            console.error('Error getting screen sources:', error);
             return { success: false, error: error.message };
         }
     });

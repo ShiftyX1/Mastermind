@@ -6,6 +6,7 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
+import { ScreenPickerDialog } from '../views/ScreenPickerDialog.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -112,6 +113,8 @@ export class CheatingDaddyApp extends LitElement {
         _storageLoaded: { state: true },
         aiProvider: { type: String },
         modelInfo: { type: Object },
+        showScreenPicker: { type: Boolean },
+        screenSources: { type: Array },
     };
 
     constructor() {
@@ -137,6 +140,8 @@ export class CheatingDaddyApp extends LitElement {
         this._storageLoaded = false;
         this.aiProvider = 'gemini';
         this.modelInfo = { model: '', visionModel: '', whisperModel: '' };
+        this.showScreenPicker = false;
+        this.screenSources = [];
 
         // Load from storage
         this._loadFromStorage();
@@ -549,6 +554,16 @@ export class CheatingDaddyApp extends LitElement {
                         <div class="view-container">${this.renderCurrentView()}</div>
                     </div>
                 </div>
+                ${this.showScreenPicker
+                    ? html`
+                          <screen-picker-dialog
+                              ?visible=${this.showScreenPicker}
+                              .sources=${this.screenSources}
+                              @source-selected=${this.handleSourceSelected}
+                              @cancelled=${this.handlePickerCancelled}
+                          ></screen-picker-dialog>
+                      `
+                    : ''}
             </div>
         `;
     }
@@ -578,6 +593,44 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         this.requestUpdate();
+    }
+
+    async showScreenPickerDialog() {
+        const { ipcRenderer } = window.require('electron');
+        const result = await ipcRenderer.invoke('get-screen-sources');
+        
+        if (result.success) {
+            this.screenSources = result.sources;
+            this.showScreenPicker = true;
+            return new Promise((resolve) => {
+                this._screenPickerResolve = resolve;
+            });
+        } else {
+            console.error('Failed to get screen sources:', result.error);
+            return { cancelled: true };
+        }
+    }
+
+    async handleSourceSelected(event) {
+        const { source } = event.detail;
+        const { ipcRenderer } = window.require('electron');
+        
+        // Tell main process which source was selected
+        await ipcRenderer.invoke('set-selected-source', source.id);
+        
+        this.showScreenPicker = false;
+        if (this._screenPickerResolve) {
+            this._screenPickerResolve({ source });
+            this._screenPickerResolve = null;
+        }
+    }
+
+    handlePickerCancelled() {
+        this.showScreenPicker = false;
+        if (this._screenPickerResolve) {
+            this._screenPickerResolve({ cancelled: true });
+            this._screenPickerResolve = null;
+        }
     }
 }
 
