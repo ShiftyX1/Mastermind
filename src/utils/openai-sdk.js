@@ -277,11 +277,14 @@ async function sendImageMessage(base64Image, prompt) {
 }
 
 // Process audio chunk and get response
-// This accumulates audio and transcribes when silence is detected
+// This accumulates audio and transcribes when silence is detected or timer expires
 let audioChunks = [];
 let lastAudioTime = 0;
+let firstChunkTime = 0;
 const SILENCE_THRESHOLD_MS = 1500; // 1.5 seconds of silence
+const MAX_BUFFER_DURATION_MS = 5000; // 5 seconds max buffering before forced transcription
 let silenceCheckTimer = null;
+let windowsTranscriptionTimer = null;
 
 async function processAudioChunk(base64Audio, mimeType) {
     if (!openaiClient) {
@@ -290,6 +293,25 @@ async function processAudioChunk(base64Audio, mimeType) {
 
     const now = Date.now();
     const buffer = Buffer.from(base64Audio, 'base64');
+
+    // Track first chunk time for duration-based flushing
+    if (audioChunks.length === 0) {
+        firstChunkTime = now;
+        
+        // Start periodic transcription timer (Windows needs this)
+        if (!windowsTranscriptionTimer && process.platform === 'win32') {
+            console.log('Starting Windows periodic transcription timer...');
+            windowsTranscriptionTimer = setInterval(async () => {
+                if (audioChunks.length > 0) {
+                    const bufferDuration = Date.now() - firstChunkTime;
+                    if (bufferDuration >= MAX_BUFFER_DURATION_MS) {
+                        console.log(`Periodic flush: ${bufferDuration}ms of audio buffered`);
+                        await flushAudioAndTranscribe();
+                    }
+                }
+            }, 2000); // Check every 2 seconds
+        }
+    }
 
     // Add to audio buffer
     audioChunks.push(buffer);
@@ -317,15 +339,30 @@ async function flushAudioAndTranscribe() {
         return { success: true, text: '' };
     }
 
+    // Clear Windows transcription timer
+    if (windowsTranscriptionTimer) {
+        clearInterval(windowsTranscriptionTimer);
+        windowsTranscriptionTimer = null;
+    }
+
     try {
         // Combine all audio chunks
         const combinedBuffer = Buffer.concat(audioChunks);
+        const chunkCount = audioChunks.length;
         audioChunks = [];
+        firstChunkTime = 0;
+
+        // Calculate audio duration
+        const bytesPerSample = 2;
+        const audioDurationMs = (combinedBuffer.length / bytesPerSample / SAMPLE_RATE) * 1000;
+        
+        console.log(`Transcribing ${chunkCount} chunks (${audioDurationMs.toFixed(0)}ms of audio)...`);
 
         // Transcribe
         const transcription = await transcribeAudio(combinedBuffer);
 
         if (transcription && transcription.trim()) {
+            console.log('Transcription result:', transcription);
             // Send to chat
             const response = await sendTextMessage(transcription);
 
@@ -347,6 +384,16 @@ function clearConversation() {
     const systemMessage = conversationMessages.find(m => m.role === 'system');
     conversationMessages = systemMessage ? [systemMessage] : [];
     audioChunks = [];
+    
+    // Clear timers
+    if (silenceCheckTimer) {
+        clearTimeout(silenceCheckTimer);
+        silenceCheckTimer = null;
+    }
+    if (windowsTranscriptionTimer) {
+        clearInterval(windowsTranscriptionTimer);
+        windowsTranscriptionTimer = null;
+    }
 }
 
 function closeOpenAISDK() {
@@ -356,6 +403,17 @@ function closeOpenAISDK() {
     conversationMessages = [];
     audioChunks = [];
     isProcessing = false;
+    
+    // Clear timers
+    if (silenceCheckTimer) {
+        clearTimeout(silenceCheckTimer);
+        silenceCheckTimer = null;
+    }
+    if (windowsTranscriptionTimer) {
+        clearInterval(windowsTranscriptionTimer);
+        windowsTranscriptionTimer = null;
+    }
+    
     sendToRenderer('update-status', 'Disconnected');
 }
 
