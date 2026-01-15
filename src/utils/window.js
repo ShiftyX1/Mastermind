@@ -582,11 +582,18 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 resizable: false,
                 movable: false,
                 hasShadow: false,
+                // Hide from screen capture/sharing
+                ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
                 webPreferences: {
                     nodeIntegration: true,
                     contextIsolation: false,
                 },
             });
+
+            // Hide window content from screen capture (macOS)
+            if (process.platform === 'darwin') {
+                regionSelectionWindow.setContentProtection(true);
+            }
 
             regionSelectionWindow.setAlwaysOnTop(true, 'screen-saver', 1);
 
