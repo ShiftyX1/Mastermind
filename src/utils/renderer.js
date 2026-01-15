@@ -186,6 +186,10 @@ ipcRenderer.on('update-status', (event, status) => {
     cheatingDaddy.setStatus(status);
 });
 
+ipcRenderer.on('push-to-talk-toggle', () => {
+    ipcRenderer.send('push-to-talk-toggle');
+});
+
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;

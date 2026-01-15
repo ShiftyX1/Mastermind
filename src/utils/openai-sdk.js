@@ -14,6 +14,8 @@ let openaiClient = null;
 let currentConfig = null;
 let conversationMessages = [];
 let isProcessing = false;
+let audioInputMode = 'auto';
+let isPushToTalkActive = false;
 
 // macOS audio capture
 let systemAudioProc = null;
@@ -294,6 +296,18 @@ async function processAudioChunk(base64Audio, mimeType) {
     const now = Date.now();
     const buffer = Buffer.from(base64Audio, 'base64');
 
+    if (audioInputMode === 'push-to-talk') {
+        if (!isPushToTalkActive) {
+            return { success: true, ignored: true };
+        }
+
+        // In push-to-talk mode we only buffer while active
+        audioChunks.push(buffer);
+        lastAudioTime = now;
+
+        return { success: true, buffering: true };
+    }
+
     // Track first chunk time for duration-based flushing
     if (audioChunks.length === 0) {
         firstChunkTime = now;
@@ -380,6 +394,97 @@ async function flushAudioAndTranscribe() {
     }
 }
 
+function notifyPushToTalkState() {
+    sendToRenderer('push-to-talk-state', {
+        active: isPushToTalkActive,
+        inputMode: audioInputMode,
+    });
+}
+
+function resetRealtimeAudioBuffer() {
+    audioChunks = [];
+    firstChunkTime = 0;
+    lastAudioTime = 0;
+
+    if (silenceCheckTimer) {
+        clearTimeout(silenceCheckTimer);
+        silenceCheckTimer = null;
+    }
+    if (windowsTranscriptionTimer) {
+        clearInterval(windowsTranscriptionTimer);
+        windowsTranscriptionTimer = null;
+    }
+}
+
+function updateTranscriptionTimerForPushToTalk() {
+    if (audioInputMode === 'push-to-talk') {
+        stopTranscriptionTimer();
+        return;
+    }
+
+    if (systemAudioProc && !transcriptionTimer) {
+        startTranscriptionTimer();
+    }
+}
+
+async function setPushToTalkActive(active) {
+    const wasActive = isPushToTalkActive;
+    isPushToTalkActive = active;
+
+    if (active) {
+        // Starting recording - clear any old buffers
+        resetRealtimeAudioBuffer();
+        audioBuffer = Buffer.alloc(0);
+        console.log('Push-to-Talk: Recording started');
+        sendToRenderer('update-status', 'Recording...');
+    }
+
+    notifyPushToTalkState();
+
+    // When user stops recording in PTT mode, send audio for transcription
+    if (!active && wasActive && audioInputMode === 'push-to-talk') {
+        console.log('Push-to-Talk: Recording stopped, transcribing...');
+        sendToRenderer('update-status', 'Transcribing...');
+
+        // For browser-based audio (Windows)
+        if (audioChunks.length > 0) {
+            await flushAudioAndTranscribe();
+        }
+        // For macOS SystemAudioDump
+        if (audioBuffer.length > 0) {
+            await transcribeBufferedAudio(true); // Force transcription
+        }
+
+        sendToRenderer('update-status', 'Listening...');
+    }
+}
+
+async function togglePushToTalk() {
+    if (isPushToTalkActive) {
+        await setPushToTalkActive(false);
+    } else {
+        await setPushToTalkActive(true);
+    }
+}
+
+function updatePushToTalkSettings(inputMode) {
+    if (inputMode) {
+        audioInputMode = inputMode;
+    }
+
+    if (audioInputMode !== 'push-to-talk' && isPushToTalkActive) {
+        isPushToTalkActive = false;
+    }
+
+    if (audioInputMode !== 'push-to-talk') {
+        resetRealtimeAudioBuffer();
+        audioBuffer = Buffer.alloc(0);
+    }
+
+    notifyPushToTalkState();
+    updateTranscriptionTimerForPushToTalk();
+}
+
 function clearConversation() {
     const systemMessage = conversationMessages.find(m => m.role === 'system');
     conversationMessages = systemMessage ? [systemMessage] : [];
@@ -403,6 +508,7 @@ function closeOpenAISDK() {
     conversationMessages = [];
     audioChunks = [];
     isProcessing = false;
+    isPushToTalkActive = false;
 
     // Clear timers
     if (silenceCheckTimer) {
@@ -414,6 +520,7 @@ function closeOpenAISDK() {
         windowsTranscriptionTimer = null;
     }
 
+    notifyPushToTalkState();
     sendToRenderer('update-status', 'Disconnected');
 }
 
@@ -461,8 +568,13 @@ function hasSpeech(buffer, threshold = 500) {
     return rms > threshold;
 }
 
-async function transcribeBufferedAudio() {
+async function transcribeBufferedAudio(forcePTT = false) {
     if (audioBuffer.length === 0 || isProcessing) {
+        return;
+    }
+
+    // In push-to-talk mode, only transcribe when explicitly requested (forcePTT=true)
+    if (audioInputMode === 'push-to-talk' && !forcePTT) {
         return;
     }
 
@@ -475,7 +587,8 @@ async function transcribeBufferedAudio() {
     }
 
     // Check if there's actual speech in the audio (Voice Activity Detection)
-    if (!hasSpeech(audioBuffer)) {
+    // Skip VAD check in PTT mode - user explicitly wants to transcribe
+    if (!forcePTT && !hasSpeech(audioBuffer)) {
         // Clear buffer if it's just silence/noise
         audioBuffer = Buffer.alloc(0);
         return;
@@ -487,7 +600,9 @@ async function transcribeBufferedAudio() {
 
     try {
         console.log(`Transcribing ${audioDurationMs.toFixed(0)}ms of audio...`);
-        sendToRenderer('update-status', 'Transcribing...');
+        if (!forcePTT) {
+            sendToRenderer('update-status', 'Transcribing...');
+        }
 
         const transcription = await transcribeAudio(currentBuffer, 'audio/wav');
 
@@ -497,12 +612,18 @@ async function transcribeBufferedAudio() {
 
             // Send to chat
             await sendTextMessage(transcription);
+        } else if (forcePTT) {
+            console.log('Push-to-Talk: No speech detected in recording');
         }
 
-        sendToRenderer('update-status', 'Listening...');
+        if (!forcePTT) {
+            sendToRenderer('update-status', 'Listening...');
+        }
     } catch (error) {
         console.error('Transcription error:', error);
-        sendToRenderer('update-status', 'Listening...');
+        if (!forcePTT) {
+            sendToRenderer('update-status', 'Listening...');
+        }
     }
 }
 
@@ -598,6 +719,10 @@ async function startMacOSAudioCapture() {
             // Convert stereo to mono
             const monoChunk = CHANNELS === 2 ? convertStereoToMono(chunk) : chunk;
 
+            if (audioInputMode === 'push-to-talk' && !isPushToTalkActive) {
+                continue;
+            }
+
             // Add to audio buffer for transcription
             audioBuffer = Buffer.concat([audioBuffer, monoChunk]);
 
@@ -643,7 +768,7 @@ async function startMacOSAudioCapture() {
     });
 
     // Start periodic transcription
-    startTranscriptionTimer();
+    updateTranscriptionTimerForPushToTalk();
 
     sendToRenderer('update-status', 'Listening...');
 
@@ -651,6 +776,10 @@ async function startMacOSAudioCapture() {
 }
 
 function startTranscriptionTimer() {
+    // Don't start auto-transcription timer in push-to-talk mode
+    if (audioInputMode === 'push-to-talk') {
+        return;
+    }
     stopTranscriptionTimer();
     transcriptionTimer = setInterval(transcribeBufferedAudio, TRANSCRIPTION_INTERVAL_MS);
 }
@@ -682,6 +811,8 @@ module.exports = {
     sendImageMessage,
     processAudioChunk,
     flushAudioAndTranscribe,
+    togglePushToTalk,
+    updatePushToTalkSettings,
     clearConversation,
     closeOpenAISDK,
     startMacOSAudioCapture,

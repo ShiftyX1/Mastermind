@@ -537,6 +537,7 @@ export class CustomizeView extends LitElement {
             color: var(--error-color);
             border-left: 2px solid var(--error-color);
         }
+
     `;
 
     static properties = {
@@ -549,6 +550,7 @@ export class CustomizeView extends LitElement {
         backgroundTransparency: { type: Number },
         fontSize: { type: Number },
         theme: { type: String },
+        audioInputMode: { type: String },
         onProfileChange: { type: Function },
         onLanguageChange: { type: Function },
         onImageQualityChange: { type: Function },
@@ -587,6 +589,7 @@ export class CustomizeView extends LitElement {
 
         // Audio mode default
         this.audioMode = 'speaker_only';
+        this.audioInputMode = 'auto';
 
         // Custom prompt
         this.customPrompt = '';
@@ -795,6 +798,7 @@ export class CustomizeView extends LitElement {
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
+            this.audioInputMode = prefs.audioInputMode ?? 'auto';
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
             this.aiProvider = prefs.aiProvider ?? 'gemini';
@@ -820,6 +824,7 @@ export class CustomizeView extends LitElement {
 
             this.updateBackgroundTransparency();
             this.updateFontSize();
+            this.notifyPushToTalkSettings();
             this.requestUpdate();
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -830,6 +835,10 @@ export class CustomizeView extends LitElement {
         super.connectedCallback();
         // Resize window for this view
         resizeLayout();
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
     }
 
     getProfiles() {
@@ -944,6 +953,28 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    async handleAudioInputModeChange(e) {
+        this.audioInputMode = e.target.value;
+        await cheatingDaddy.storage.updatePreference('audioInputMode', e.target.value);
+        this.notifyPushToTalkSettings();
+        this.requestUpdate();
+    }
+
+    notifyPushToTalkSettings() {
+        if (!window.require) {
+            return;
+        }
+        try {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.send('update-push-to-talk-settings', {
+                inputMode: this.audioInputMode,
+            });
+            ipcRenderer.send('update-keybinds', this.keybinds);
+        } catch (error) {
+            console.error('Failed to notify push-to-talk settings:', error);
+        }
+    }
+
     async handleThemeChange(e) {
         this.theme = e.target.value;
         await cheatingDaddy.theme.save(this.theme);
@@ -965,6 +996,7 @@ export class CustomizeView extends LitElement {
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            pushToTalk: isMac ? 'Ctrl+Space' : 'Ctrl+Space',
         };
     }
 
@@ -1049,6 +1081,11 @@ export class CustomizeView extends LitElement {
                 key: 'scrollDown',
                 name: 'Scroll Response Down',
                 description: 'Scroll the AI response content down',
+            },
+            {
+                key: 'pushToTalk',
+                name: 'Push-to-Talk',
+                description: 'Activate audio recording (OpenAI SDK only)',
             },
         ];
     }
@@ -1319,6 +1356,9 @@ export class CustomizeView extends LitElement {
     }
 
     renderAudioSection() {
+        const isPushToTalkAvailable = this.aiProvider === 'openai-sdk';
+        const pushToTalkDisabled = !isPushToTalkAvailable;
+
         return html`
             <div class="content-header">Audio Settings</div>
             <div class="form-grid">
@@ -1331,6 +1371,28 @@ export class CustomizeView extends LitElement {
                     </select>
                     <div class="form-description">Choose which audio sources to capture for the AI.</div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Audio Input Mode</label>
+                    <select
+                        class="form-control"
+                        .value=${this.audioInputMode}
+                        @change=${this.handleAudioInputModeChange}
+                        ?disabled=${pushToTalkDisabled}
+                    >
+                        <option value="auto">Automatic (Always Listening)</option>
+                        <option value="push-to-talk">Push-to-Talk (Hotkey Activated)</option>
+                    </select>
+                    <div class="form-description">
+                        ${pushToTalkDisabled
+                            ? 'Push-to-Talk is available only with the OpenAI SDK provider.'
+                            : this.audioInputMode === 'auto'
+                              ? 'Audio is continuously recorded and transcribed when silence is detected.'
+                              : 'Audio recording starts when you press and hold/toggle the hotkey.'}
+                    </div>
+                </div>
+                ${this.audioInputMode === 'push-to-talk'
+                    ? html`<div class="form-description">Use the Push-to-Talk hotkey (toggle) to start/stop recording.</div>`
+                    : ''}
             </div>
         `;
     }

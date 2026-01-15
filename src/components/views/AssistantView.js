@@ -366,6 +366,57 @@ export class AssistantView extends LitElement {
         .region-select-btn span {
             margin-left: 4px;
         }
+
+        .ptt-toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .ptt-toggle-btn:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+            border-color: var(--text-color);
+        }
+
+        .ptt-toggle-btn.active {
+            color: var(--error-color);
+            border-color: var(--error-color);
+        }
+
+        .ptt-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .ptt-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border-color);
+            box-shadow: 0 0 0 1px var(--border-color);
+        }
+
+        .ptt-dot.active {
+            background: var(--error-color);
+            box-shadow: 0 0 0 1px var(--error-color);
+        }
+
+        .ptt-label {
+            font-family: 'SF Mono', Monaco, monospace;
+        }
     `;
 
     static properties = {
@@ -377,6 +428,9 @@ export class AssistantView extends LitElement {
         flashCount: { type: Number },
         flashLiteCount: { type: Number },
         aiProvider: { type: String },
+        pushToTalkActive: { type: Boolean },
+        audioInputMode: { type: String },
+        pushToTalkKeybind: { type: String },
     };
 
     constructor() {
@@ -388,6 +442,9 @@ export class AssistantView extends LitElement {
         this.flashCount = 0;
         this.flashLiteCount = 0;
         this.aiProvider = 'gemini';
+        this.pushToTalkActive = false;
+        this.audioInputMode = 'auto';
+        this.pushToTalkKeybind = '';
     }
 
     getProfileNames() {
@@ -507,6 +564,7 @@ export class AssistantView extends LitElement {
 
         // Load limits on mount
         this.loadLimits();
+        this.loadPushToTalkKeybind();
 
         // Set up IPC listeners for keyboard shortcuts
         if (window.require) {
@@ -532,10 +590,17 @@ export class AssistantView extends LitElement {
                 this.scrollResponseDown();
             };
 
+            this.handlePushToTalkState = (event, state) => {
+                this.pushToTalkActive = state?.active ?? false;
+                this.audioInputMode = state?.inputMode ?? 'auto';
+                this.requestUpdate();
+            };
+
             ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
             ipcRenderer.on('navigate-next-response', this.handleNextResponse);
             ipcRenderer.on('scroll-response-up', this.handleScrollUp);
             ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            ipcRenderer.on('push-to-talk-state', this.handlePushToTalkState);
         }
     }
 
@@ -556,6 +621,9 @@ export class AssistantView extends LitElement {
             }
             if (this.handleScrollDown) {
                 ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
+            }
+            if (this.handlePushToTalkState) {
+                ipcRenderer.removeListener('push-to-talk-state', this.handlePushToTalkState);
             }
         }
     }
@@ -584,6 +652,15 @@ export class AssistantView extends LitElement {
         }
     }
 
+    async loadPushToTalkKeybind() {
+        if (window.cheatingDaddy?.storage?.getKeybinds) {
+            const isMac = window.cheatingDaddy?.isMacOS || navigator.platform.includes('Mac');
+            const defaultKeybind = isMac ? 'Ctrl+Space' : 'Ctrl+Space';
+            const keybinds = await window.cheatingDaddy.storage.getKeybinds();
+            this.pushToTalkKeybind = keybinds?.pushToTalk || defaultKeybind;
+        }
+    }
+
     getTotalUsed() {
         return this.flashCount + this.flashLiteCount;
     }
@@ -606,6 +683,14 @@ export class AssistantView extends LitElement {
             // Reload limits after a short delay to catch the update
             setTimeout(() => this.loadLimits(), 1000);
         }
+    }
+
+    handlePushToTalkToggle() {
+        if (!window.require) {
+            return;
+        }
+        const { ipcRenderer } = window.require('electron');
+        ipcRenderer.send('push-to-talk-toggle');
     }
 
     scrollToBottom() {
@@ -649,9 +734,25 @@ export class AssistantView extends LitElement {
 
     render() {
         const responseCounter = this.getResponseCounter();
+        const showPushToTalk = this.aiProvider === 'openai-sdk' && this.audioInputMode === 'push-to-talk';
+        const keybindLabel = this.pushToTalkKeybind || 'Hotkey';
+        const pushToTalkLabel = this.pushToTalkActive
+            ? 'Recording...'
+            : `Press ${keybindLabel} to start/stop`;
+        const pushToTalkButtonLabel = this.pushToTalkActive ? 'Stop' : 'Record';
 
         return html`
             <div class="response-container" id="responseContainer"></div>
+
+            ${showPushToTalk
+                ? html`
+                      <div class="ptt-indicator">
+                          <span class="ptt-dot ${this.pushToTalkActive ? 'active' : ''}"></span>
+                          <span>Push-to-Talk:</span>
+                          <span class="ptt-label">${pushToTalkLabel}</span>
+                      </div>
+                  `
+                : ''}
 
             <div class="text-input-container">
                 <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
@@ -671,6 +772,17 @@ export class AssistantView extends LitElement {
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
                 <div class="capture-buttons">
+                    ${showPushToTalk
+                        ? html`
+                              <button
+                                  class="ptt-toggle-btn ${this.pushToTalkActive ? 'active' : ''}"
+                                  @click=${this.handlePushToTalkToggle}
+                                  title="Toggle Push-to-Talk recording"
+                              >
+                                  ${pushToTalkButtonLabel}
+                              </button>
+                          `
+                        : ''}
                     <button class="region-select-btn" @click=${this.handleRegionSelect} title="Select region to analyze (like Win+Shift+S)">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path

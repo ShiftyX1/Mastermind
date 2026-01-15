@@ -9,6 +9,7 @@ let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
+
 function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
@@ -155,6 +156,7 @@ function getDefaultKeybinds() {
         scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
         scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
         emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
+        pushToTalk: isMac ? 'Ctrl+Space' : 'Ctrl+Space',
     };
 }
 
@@ -163,6 +165,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
+
+    const prefs = storage.getPreferences();
+    const audioInputMode = prefs.audioInputMode || 'auto';
+    const enablePushToTalk = audioInputMode === 'push-to-talk';
 
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
@@ -341,6 +347,18 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
         } catch (error) {
             console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
+        }
+    }
+
+    // Register push-to-talk shortcut (OpenAI SDK only, gated by preferences)
+    if (keybinds.pushToTalk && enablePushToTalk) {
+        try {
+            globalShortcut.register(keybinds.pushToTalk, () => {
+                sendToRenderer('push-to-talk-toggle');
+            });
+            console.log(`Registered pushToTalk (toggle): ${keybinds.pushToTalk}`);
+        } catch (error) {
+            console.error(`Failed to register pushToTalk (${keybinds.pushToTalk}):`, error);
         }
     }
 }

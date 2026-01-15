@@ -186,6 +186,7 @@ async function initializeAISession(customPrompt = '', profile = 'interview', lan
         try {
             await openaiSdkProvider.initializeOpenAISDK(providerConfig);
             openaiSdkProvider.setSystemPrompt(systemPrompt);
+            openaiSdkProvider.updatePushToTalkSettings(prefs.audioInputMode || 'auto');
             sendToRenderer('update-status', 'Ready (OpenAI SDK)');
             return true;
         } catch (error) {
@@ -323,6 +324,16 @@ function setupAIProviderIpcHandlers(geminiSessionRef) {
     // Listen for conversation turn save requests from providers
     ipcMain.on('save-conversation-turn-data', (event, { transcription, response }) => {
         saveConversationTurn(transcription, response);
+    });
+
+    ipcMain.on('push-to-talk-toggle', () => {
+        if (currentProvider === 'openai-sdk') {
+            openaiSdkProvider.togglePushToTalk();
+        }
+    });
+
+    ipcMain.on('update-push-to-talk-settings', (event, { inputMode } = {}) => {
+        openaiSdkProvider.updatePushToTalkSettings(inputMode || 'auto');
     });
 
     ipcMain.handle('initialize-ai-session', async (event, customPrompt, profile, language) => {

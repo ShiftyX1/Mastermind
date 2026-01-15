@@ -295,7 +295,7 @@ export class HelpView extends LitElement {
                         <span>Community & Support</span>
                     </div>
                     <div class="community-links">
-                        <div class="community-link" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com')}>
+                        <!-- <div class="community-link" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com')}>
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -312,8 +312,8 @@ export class HelpView extends LitElement {
                                 ></path>
                             </svg>
                             Website
-                        </div>
-                        <div class="community-link" @click=${() => this.handleExternalLinkClick('https://github.com/sohzm/cheating-daddy')}>
+                        </div> -->
+                        <div class="community-link" @click=${() => this.handleExternalLinkClick('https://github.com/ShiftyX1/Mastermind')}>
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -329,7 +329,7 @@ export class HelpView extends LitElement {
                             </svg>
                             GitHub
                         </div>
-                        <div class="community-link" @click=${() => this.handleExternalLinkClick('https://discord.gg/GCBdubnXfJ')}>
+                        <!-- <div class="community-link" @click=${() => this.handleExternalLinkClick('https://discord.gg/GCBdubnXfJ')}>
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -353,7 +353,7 @@ export class HelpView extends LitElement {
                                 ></path>
                             </svg>
                             Discord
-                        </div>
+                        </div> -->
                     </div>
                 </div>
 

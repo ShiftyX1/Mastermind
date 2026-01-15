@@ -33,6 +33,7 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
+    audioInputMode: 'auto',
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
