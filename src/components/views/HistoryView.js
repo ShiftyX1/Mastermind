@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HistoryView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -505,18 +509,22 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="session-context">
-                ${profile ? html`
-                    <div class="session-context-row">
-                        <span class="context-label">Profile:</span>
-                        <span class="context-value">${profileNames[profile] || profile}</span>
-                    </div>
-                ` : ''}
-                ${customPrompt ? html`
-                    <div class="session-context-row">
-                        <span class="context-label">Custom Prompt:</span>
-                        <span class="custom-prompt-value">${customPrompt}</span>
-                    </div>
-                ` : ''}
+                ${profile
+                    ? html`
+                          <div class="session-context-row">
+                              <span class="context-label">Profile:</span>
+                              <span class="context-value">${profileNames[profile] || profile}</span>
+                          </div>
+                      `
+                    : ''}
+                ${customPrompt
+                    ? html`
+                          <div class="session-context-row">
+                              <span class="context-label">Custom Prompt:</span>
+                              <span class="custom-prompt-value">${customPrompt}</span>
+                          </div>
+                      `
+                    : ''}
             </div>
         `;
     }
@@ -559,9 +567,14 @@ export class HistoryView extends LitElement {
             return html`<div class="empty-state">No screen analysis data available</div>`;
         }
 
-        return screenAnalysisHistory.map(analysis => html`
-            <div class="message screen"><div class="analysis-meta">${this.formatTimestamp(analysis.timestamp)} • ${analysis.model || 'unknown model'}</div>${analysis.response}</div>
-        `);
+        return screenAnalysisHistory.map(
+            analysis => html`
+                <div class="message screen">
+                    <div class="analysis-meta">${this.formatTimestamp(analysis.timestamp)} • ${analysis.model || 'unknown model'}</div>
+                    ${analysis.response}
+                </div>
+            `
+        );
     }
 
     renderConversationView() {
@@ -604,22 +617,13 @@ export class HistoryView extends LitElement {
                 </div>
             </div>
             <div class="view-tabs">
-                <button
-                    class="view-tab ${this.activeTab === 'conversation' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('conversation')}
-                >
+                <button class="view-tab ${this.activeTab === 'conversation' ? 'active' : ''}" @click=${() => this.handleTabClick('conversation')}>
                     Conversation ${hasConversation ? `(${conversationHistory.length})` : ''}
                 </button>
-                <button
-                    class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('screen')}
-                >
+                <button class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}" @click=${() => this.handleTabClick('screen')}>
                     Screen ${hasScreenAnalysis ? `(${screenAnalysisHistory.length})` : ''}
                 </button>
-                <button
-                    class="view-tab ${this.activeTab === 'context' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('context')}
-                >
+                <button class="view-tab ${this.activeTab === 'context' ? 'active' : ''}" @click=${() => this.handleTabClick('context')}>
                     Context ${hasContext ? '' : '(empty)'}
                 </button>
             </div>
@@ -627,8 +631,8 @@ export class HistoryView extends LitElement {
                 ${this.activeTab === 'conversation'
                     ? this.renderConversationContent()
                     : this.activeTab === 'screen'
-                        ? this.renderScreenAnalysisContent()
-                        : this.renderContextContent()}
+                      ? this.renderScreenAnalysisContent()
+                      : this.renderContextContent()}
             </div>
         `;
     }
@@ -638,11 +642,7 @@ export class HistoryView extends LitElement {
             return html`<div class="history-container">${this.renderConversationView()}</div>`;
         }
 
-        return html`
-            <div class="history-container">
-                ${this.renderSessionsList()}
-            </div>
-        `;
+        return html` <div class="history-container">${this.renderSessionsList()}</div> `;
     }
 }
 

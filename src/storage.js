@@ -8,7 +8,7 @@ const CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal'
+    layout: 'normal',
 };
 
 const DEFAULT_CREDENTIALS = {
@@ -22,7 +22,7 @@ const DEFAULT_CREDENTIALS = {
     openaiSdkBaseUrl: '',
     openaiSdkModel: 'gpt-4o',
     openaiSdkVisionModel: 'gpt-4o',
-    openaiSdkWhisperModel: 'whisper-1'
+    openaiSdkWhisperModel: 'whisper-1',
 };
 
 const DEFAULT_PREFERENCES = {
@@ -36,13 +36,13 @@ const DEFAULT_PREFERENCES = {
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
-    aiProvider: 'gemini'
+    aiProvider: 'gemini',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
 };
 
 // Get the config directory path based on OS
@@ -208,7 +208,7 @@ function getOpenAICredentials() {
     return {
         apiKey: creds.openaiApiKey || '',
         baseUrl: creds.openaiBaseUrl || '',
-        model: creds.openaiModel || 'gpt-4o-realtime-preview-2024-12-17'
+        model: creds.openaiModel || 'gpt-4o-realtime-preview-2024-12-17',
     };
 }
 
@@ -227,7 +227,7 @@ function getOpenAISDKCredentials() {
         baseUrl: creds.openaiSdkBaseUrl || '',
         model: creds.openaiSdkModel || 'gpt-4o',
         visionModel: creds.openaiSdkVisionModel || 'gpt-4o',
-        whisperModel: creds.openaiSdkWhisperModel || 'whisper-1'
+        whisperModel: creds.openaiSdkWhisperModel || 'whisper-1',
     };
 }
 
@@ -301,7 +301,7 @@ function getTodayLimits() {
     const newEntry = {
         date: today,
         flash: { count: 0 },
-        flashLite: { count: 0 }
+        flashLite: { count: 0 },
     };
     limits.data.push(newEntry);
     setLimits(limits);
@@ -322,7 +322,7 @@ function incrementLimitCount(model) {
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 }
+            flashLite: { count: 0 },
         };
         limits.data.push(todayEntry);
     } else {
@@ -376,7 +376,7 @@ function saveSession(sessionId, data) {
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -393,7 +393,8 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs.readdirSync(historyDir)
+        const files = fs
+            .readdirSync(historyDir)
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => {
                 // Sort by timestamp descending (newest first)
@@ -402,22 +403,24 @@ function getAllSessions() {
                 return tsB - tsA;
             });
 
-        return files.map(file => {
-            const sessionId = file.replace('.json', '');
-            const data = readJsonFile(path.join(historyDir, file), null);
-            if (data) {
-                return {
-                    sessionId,
-                    createdAt: data.createdAt,
-                    lastUpdated: data.lastUpdated,
-                    messageCount: data.conversationHistory?.length || 0,
-                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
-                    profile: data.profile || null,
-                    customPrompt: data.customPrompt || null
-                };
-            }
-            return null;
-        }).filter(Boolean);
+        return files
+            .map(file => {
+                const sessionId = file.replace('.json', '');
+                const data = readJsonFile(path.join(historyDir, file), null);
+                if (data) {
+                    return {
+                        sessionId,
+                        createdAt: data.createdAt,
+                        lastUpdated: data.lastUpdated,
+                        messageCount: data.conversationHistory?.length || 0,
+                        screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                        profile: data.profile || null,
+                        customPrompt: data.customPrompt || null,
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -504,5 +507,5 @@ module.exports = {
     deleteAllSessions,
 
     // Clear all
-    clearAllData
+    clearAllData,
 };

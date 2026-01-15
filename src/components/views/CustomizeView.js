@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -634,31 +638,87 @@ export class CustomizeView extends LitElement {
 
     renderSidebarIcon(icon) {
         const icons = {
-            user: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"></path>
+            user: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"
+                ></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>`,
-            mic: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            mic: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                 <line x1="12" y1="19" x2="12" y2="23"></line>
                 <line x1="8" y1="23" x2="16" y2="23"></line>
             </svg>`,
-            globe: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            globe: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="2" y1="12" x2="22" y2="12"></line>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>`,
-            display: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            display: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>`,
-            camera: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            camera: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
             </svg>`,
-            keyboard: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            keyboard: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
                 <path d="M6 8h.001"></path>
                 <path d="M10 8h.001"></path>
@@ -669,11 +729,29 @@ export class CustomizeView extends LitElement {
                 <path d="M16 12h.001"></path>
                 <path d="M7 16h10"></path>
             </svg>`,
-            search: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            search: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>`,
-            cpu: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            cpu: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
                 <rect x="9" y="9" width="6" height="6"></rect>
                 <line x1="9" y1="1" x2="9" y2="4"></line>
@@ -685,7 +763,16 @@ export class CustomizeView extends LitElement {
                 <line x1="1" y1="9" x2="4" y2="9"></line>
                 <line x1="1" y1="14" x2="4" y2="14"></line>
             </svg>`,
-            warning: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            warning: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -701,7 +788,7 @@ export class CustomizeView extends LitElement {
                 cheatingDaddy.storage.getKeybinds(),
                 cheatingDaddy.storage.getCredentials(),
                 cheatingDaddy.storage.getOpenAICredentials(),
-                cheatingDaddy.storage.getOpenAISDKCredentials()
+                cheatingDaddy.storage.getOpenAISDKCredentials(),
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
@@ -711,15 +798,15 @@ export class CustomizeView extends LitElement {
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
             this.aiProvider = prefs.aiProvider ?? 'gemini';
-            
+
             // Load Gemini API key
             this.geminiApiKey = credentials.apiKey ?? '';
-            
+
             // Load OpenAI Realtime credentials
             this.openaiApiKey = openaiCreds.apiKey ?? '';
             this.openaiBaseUrl = openaiCreds.baseUrl ?? '';
             this.openaiModel = openaiCreds.model ?? 'gpt-4o-realtime-preview-2024-12-17';
-            
+
             // Load OpenAI SDK credentials
             this.openaiSdkApiKey = openaiSdkCreds.apiKey ?? '';
             this.openaiSdkBaseUrl = openaiSdkCreds.baseUrl ?? '';
@@ -1072,21 +1159,21 @@ export class CustomizeView extends LitElement {
     async handleOpenAIApiKeyInput(e) {
         this.openaiApiKey = e.target.value;
         await cheatingDaddy.storage.setOpenAICredentials({
-            apiKey: e.target.value
+            apiKey: e.target.value,
         });
     }
 
     async handleOpenAIBaseUrlInput(e) {
         this.openaiBaseUrl = e.target.value;
         await cheatingDaddy.storage.setOpenAICredentials({
-            baseUrl: e.target.value
+            baseUrl: e.target.value,
         });
     }
 
     async handleOpenAIModelInput(e) {
         this.openaiModel = e.target.value;
         await cheatingDaddy.storage.setOpenAICredentials({
-            model: e.target.value
+            model: e.target.value,
         });
     }
 
@@ -1094,35 +1181,35 @@ export class CustomizeView extends LitElement {
     async handleOpenAISdkApiKeyInput(e) {
         this.openaiSdkApiKey = e.target.value;
         await cheatingDaddy.storage.setOpenAISDKCredentials({
-            apiKey: e.target.value
+            apiKey: e.target.value,
         });
     }
 
     async handleOpenAISdkBaseUrlInput(e) {
         this.openaiSdkBaseUrl = e.target.value;
         await cheatingDaddy.storage.setOpenAISDKCredentials({
-            baseUrl: e.target.value
+            baseUrl: e.target.value,
         });
     }
 
     async handleOpenAISdkModelInput(e) {
         this.openaiSdkModel = e.target.value;
         await cheatingDaddy.storage.setOpenAISDKCredentials({
-            model: e.target.value
+            model: e.target.value,
         });
     }
 
     async handleOpenAISdkVisionModelInput(e) {
         this.openaiSdkVisionModel = e.target.value;
         await cheatingDaddy.storage.setOpenAISDKCredentials({
-            visionModel: e.target.value
+            visionModel: e.target.value,
         });
     }
 
     async handleOpenAISdkWhisperModelInput(e) {
         this.openaiSdkWhisperModel = e.target.value;
         await cheatingDaddy.storage.setOpenAISDKCredentials({
-            whisperModel: e.target.value
+            whisperModel: e.target.value,
         });
     }
 
@@ -1209,9 +1296,7 @@ export class CustomizeView extends LitElement {
                         <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
                             ${profiles.map(
                                 profile => html`
-                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                        ${profile.name}
-                                    </option>
+                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>${profile.name}</option>
                                 `
                             )}
                         </select>
@@ -1221,15 +1306,12 @@ export class CustomizeView extends LitElement {
                         <label class="form-label">Custom AI Instructions</label>
                         <textarea
                             class="form-control"
-                            placeholder="Add specific instructions for how you want the AI to behave during ${
-                                profileNames[this.selectedProfile] || 'this interaction'
-                            }..."
+                            placeholder="Add specific instructions for how you want the AI to behave during ${profileNames[this.selectedProfile] ||
+                            'this interaction'}..."
                             .value=${this.customPrompt}
                             @input=${this.handleCustomPromptInput}
                         ></textarea>
-                        <div class="form-description">
-                            Personalize the AI's behavior with specific instructions
-                        </div>
+                        <div class="form-description">Personalize the AI's behavior with specific instructions</div>
                     </div>
                 </div>
             </div>
@@ -1247,9 +1329,7 @@ export class CustomizeView extends LitElement {
                         <option value="mic_only">Microphone Only (Me)</option>
                         <option value="both">Both Speaker & Microphone</option>
                     </select>
-                    <div class="form-description">
-                        Choose which audio sources to capture for the AI.
-                    </div>
+                    <div class="form-description">Choose which audio sources to capture for the AI.</div>
                 </div>
             </div>
         `;
@@ -1270,9 +1350,7 @@ export class CustomizeView extends LitElement {
                     <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                         ${languages.map(
                             language => html`
-                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>
-                                    ${language.name}
-                                </option>
+                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>${language.name}</option>
                             `
                         )}
                     </select>
@@ -1295,17 +1373,9 @@ export class CustomizeView extends LitElement {
                         <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
                     </label>
                     <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
-                        ${themes.map(
-                            theme => html`
-                                <option value=${theme.value} ?selected=${this.theme === theme.value}>
-                                    ${theme.name}
-                                </option>
-                            `
-                        )}
+                        ${themes.map(theme => html` <option value=${theme.value} ?selected=${this.theme === theme.value}>${theme.name}</option> `)}
                     </select>
-                    <div class="form-description">
-                        Choose a color theme for the interface
-                    </div>
+                    <div class="form-description">Choose a color theme for the interface</div>
                 </div>
 
                 <div class="form-group">
@@ -1318,10 +1388,7 @@ export class CustomizeView extends LitElement {
                         <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
                     </select>
                     <div class="form-description">
-                        ${this.layoutMode === 'compact'
-                            ? 'Smaller window with reduced padding'
-                            : 'Standard layout with comfortable spacing'
-                        }
+                        ${this.layoutMode === 'compact' ? 'Smaller window with reduced padding' : 'Standard layout with comfortable spacing'}
                     </div>
                 </div>
 
@@ -1379,7 +1446,9 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <label class="form-label">
                         Image Quality
-                        <span class="current-selection">${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span>
+                        <span class="current-selection"
+                            >${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span
+                        >
                     </label>
                     <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
                         <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
@@ -1391,8 +1460,7 @@ export class CustomizeView extends LitElement {
                             ? 'Best quality, uses more tokens'
                             : this.selectedImageQuality === 'medium'
                               ? 'Balanced quality and token usage'
-                              : 'Lower quality, uses fewer tokens'
-                        }
+                              : 'Lower quality, uses fewer tokens'}
                     </div>
                 </div>
             </div>
@@ -1446,9 +1514,9 @@ export class CustomizeView extends LitElement {
 
     renderAIProviderSection() {
         const providerNames = {
-            'gemini': 'Google Gemini',
+            gemini: 'Google Gemini',
             'openai-realtime': 'OpenAI Realtime',
-            'openai-sdk': 'OpenAI SDK (BotHub, etc.)'
+            'openai-sdk': 'OpenAI SDK (BotHub, etc.)',
         };
 
         return html`
@@ -1464,135 +1532,136 @@ export class CustomizeView extends LitElement {
                         <option value="openai-realtime" ?selected=${this.aiProvider === 'openai-realtime'}>OpenAI Realtime API</option>
                         <option value="openai-sdk" ?selected=${this.aiProvider === 'openai-sdk'}>OpenAI SDK (BotHub, Azure, etc.)</option>
                     </select>
-                    <div class="form-description">
-                        Choose which AI provider to use for conversations and screen analysis
-                    </div>
+                    <div class="form-description">Choose which AI provider to use for conversations and screen analysis</div>
                 </div>
 
-                ${this.aiProvider === 'gemini' ? html`
-                    <div class="form-group full-width">
-                        <label class="form-label">Gemini API Key</label>
-                        <input
-                            type="password"
-                            class="form-control"
-                            placeholder="Enter your Gemini API key"
-                            .value=${this.geminiApiKey}
-                            @input=${this.handleGeminiApiKeyInput}
-                        />
-                        <div class="form-description">
-                            Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--text-color);">Google AI Studio</a>
-                        </div>
-                    </div>
-                ` : this.aiProvider === 'openai-realtime' ? html`
-                    <div class="form-group full-width">
-                        <label class="form-label">OpenAI API Key</label>
-                        <input
-                            type="password"
-                            class="form-control"
-                            placeholder="Enter your OpenAI API key"
-                            .value=${this.openaiApiKey}
-                            @input=${this.handleOpenAIApiKeyInput}
-                        />
-                        <div class="form-description">
-                            Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--text-color);">OpenAI Platform</a>
-                        </div>
-                    </div>
+                ${this.aiProvider === 'gemini'
+                    ? html`
+                          <div class="form-group full-width">
+                              <label class="form-label">Gemini API Key</label>
+                              <input
+                                  type="password"
+                                  class="form-control"
+                                  placeholder="Enter your Gemini API key"
+                                  .value=${this.geminiApiKey}
+                                  @input=${this.handleGeminiApiKeyInput}
+                              />
+                              <div class="form-description">
+                                  Get your API key from
+                                  <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--text-color);"
+                                      >Google AI Studio</a
+                                  >
+                              </div>
+                          </div>
+                      `
+                    : this.aiProvider === 'openai-realtime'
+                      ? html`
+                            <div class="form-group full-width">
+                                <label class="form-label">OpenAI API Key</label>
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    placeholder="Enter your OpenAI API key"
+                                    .value=${this.openaiApiKey}
+                                    @input=${this.handleOpenAIApiKeyInput}
+                                />
+                                <div class="form-description">
+                                    Get your API key from
+                                    <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--text-color);"
+                                        >OpenAI Platform</a
+                                    >
+                                </div>
+                            </div>
 
-                    <div class="form-group full-width">
-                        <label class="form-label">Base URL (Optional)</label>
-                        <input
-                            type="text"
-                            class="form-control"
-                            placeholder="wss://api.openai.com/v1/realtime (leave empty for default)"
-                            .value=${this.openaiBaseUrl}
-                            @input=${this.handleOpenAIBaseUrlInput}
-                        />
-                        <div class="form-description">
-                            Override the base URL for OpenAI-compatible APIs
-                        </div>
-                    </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Base URL (Optional)</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="wss://api.openai.com/v1/realtime (leave empty for default)"
+                                    .value=${this.openaiBaseUrl}
+                                    @input=${this.handleOpenAIBaseUrlInput}
+                                />
+                                <div class="form-description">Override the base URL for OpenAI-compatible APIs</div>
+                            </div>
 
-                    <div class="form-group full-width">
-                        <label class="form-label">Model</label>
-                        <input
-                            type="text"
-                            class="form-control"
-                            placeholder="gpt-4o-realtime-preview-2024-12-17"
-                            .value=${this.openaiModel}
-                            @input=${this.handleOpenAIModelInput}
-                        />
-                        <div class="form-description">
-                            Realtime API model to use
-                        </div>
-                    </div>
-                ` : html`
-                    <div class="form-group full-width">
-                        <label class="form-label">API Key</label>
-                        <input
-                            type="password"
-                            class="form-control"
-                            placeholder="Enter your API key"
-                            .value=${this.openaiSdkApiKey}
-                            @input=${this.handleOpenAISdkApiKeyInput}
-                        />
-                        <div class="form-description">
-                            API key for your provider (BotHub, Azure, OpenRouter, etc.)
-                        </div>
-                    </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Model</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="gpt-4o-realtime-preview-2024-12-17"
+                                    .value=${this.openaiModel}
+                                    @input=${this.handleOpenAIModelInput}
+                                />
+                                <div class="form-description">Realtime API model to use</div>
+                            </div>
+                        `
+                      : html`
+                            <div class="form-group full-width">
+                                <label class="form-label">API Key</label>
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    placeholder="Enter your API key"
+                                    .value=${this.openaiSdkApiKey}
+                                    @input=${this.handleOpenAISdkApiKeyInput}
+                                />
+                                <div class="form-description">API key for your provider (BotHub, Azure, OpenRouter, etc.)</div>
+                            </div>
 
-                    <div class="form-group full-width">
-                        <label class="form-label">Base URL</label>
-                        <input
-                            type="text"
-                            class="form-control"
-                            placeholder="https://bothub.chat/api/v2/openai/v1"
-                            .value=${this.openaiSdkBaseUrl}
-                            @input=${this.handleOpenAISdkBaseUrlInput}
-                        />
-                        <div class="form-description">
-                            API endpoint URL (e.g., https://bothub.chat/api/v2/openai/v1)
-                        </div>
-                    </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Base URL</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="https://bothub.chat/api/v2/openai/v1"
+                                    .value=${this.openaiSdkBaseUrl}
+                                    @input=${this.handleOpenAISdkBaseUrlInput}
+                                />
+                                <div class="form-description">API endpoint URL (e.g., https://bothub.chat/api/v2/openai/v1)</div>
+                            </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Chat Model</label>
-                            <input
-                                type="text"
-                                class="form-control"
-                                placeholder="gpt-4o"
-                                .value=${this.openaiSdkModel}
-                                @input=${this.handleOpenAISdkModelInput}
-                            />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Vision Model</label>
-                            <input
-                                type="text"
-                                class="form-control"
-                                placeholder="gpt-4o"
-                                .value=${this.openaiSdkVisionModel}
-                                @input=${this.handleOpenAISdkVisionModelInput}
-                            />
-                        </div>
-                    </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Chat Model</label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        placeholder="gpt-4o"
+                                        .value=${this.openaiSdkModel}
+                                        @input=${this.handleOpenAISdkModelInput}
+                                    />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Vision Model</label>
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        placeholder="gpt-4o"
+                                        .value=${this.openaiSdkVisionModel}
+                                        @input=${this.handleOpenAISdkVisionModelInput}
+                                    />
+                                </div>
+                            </div>
 
-                    <div class="form-group full-width">
-                        <label class="form-label">Whisper Model (Transcription)</label>
-                        <input
-                            type="text"
-                            class="form-control"
-                            placeholder="whisper-1"
-                            .value=${this.openaiSdkWhisperModel}
-                            @input=${this.handleOpenAISdkWhisperModelInput}
-                        />
-                        <div class="form-description">
-                            Model for audio transcription
-                        </div>
-                    </div>
-                `}
+                            <div class="form-group full-width">
+                                <label class="form-label">Whisper Model (Transcription)</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="whisper-1"
+                                    .value=${this.openaiSdkWhisperModel}
+                                    @input=${this.handleOpenAISdkWhisperModelInput}
+                                />
+                                <div class="form-description">Model for audio transcription</div>
+                            </div>
+                        `}
 
-                <div class="form-description full-width" style="margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-left: 2px solid var(--border-default); border-radius: 3px;">
+                <div
+                    class="form-description full-width"
+                    style="margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-left: 2px solid var(--border-default); border-radius: 3px;"
+                >
                     <strong>Note:</strong> You must restart the AI session for provider changes to take effect.
                 </div>
             </div>
@@ -1628,20 +1697,19 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <label class="form-label" style="color: var(--error-color);">Data Management</label>
                     <div class="form-description" style="margin-bottom: 12px;">
-                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
+                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session
+                        history. This cannot be undone.
                     </div>
-                    <button
-                        class="danger-button"
-                        @click=${this.clearLocalData}
-                        ?disabled=${this.isClearing}
-                    >
+                    <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
                         ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
                     </button>
-                    ${this.clearStatusMessage ? html`
-                        <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
-                            ${this.clearStatusMessage}
-                        </div>
-                    ` : ''}
+                    ${this.clearStatusMessage
+                        ? html`
+                              <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
+                                  ${this.clearStatusMessage}
+                              </div>
+                          `
+                        : ''}
                 </div>
             </div>
         `;
@@ -1690,9 +1758,7 @@ export class CustomizeView extends LitElement {
                         `
                     )}
                 </nav>
-                <div class="settings-content">
-                    ${this.renderSectionContent()}
-                </div>
+                <div class="settings-content">${this.renderSectionContent()}</div>
             </div>
         `;
     }

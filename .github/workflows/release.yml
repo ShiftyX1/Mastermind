@@ -1,100 +1,100 @@
 name: Build and Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+    push:
+        tags:
+            - 'v*.*.*'
 
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  build:
-    if: github.server_url == 'https://github.com'
-    
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            platform: darwin
-            arch: x64
-          - os: macos-latest
-            platform: darwin
-            arch: arm64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-          - os: windows-latest
-            platform: win32
-            arch: x64
+    build:
+        if: github.server_url == 'https://github.com'
 
-    runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                include:
+                    - os: macos-latest
+                      platform: darwin
+                      arch: x64
+                    - os: macos-latest
+                      platform: darwin
+                      arch: arm64
+                    - os: ubuntu-latest
+                      platform: linux
+                      arch: x64
+                    - os: windows-latest
+                      platform: win32
+                      arch: x64
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        runs-on: ${{ matrix.os }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
 
-      - name: Install dependencies
-        run: pnpm install
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
 
-      - name: Build for ${{ matrix.platform }}-${{ matrix.arch }}
-        run: pnpm run make -- --arch=${{ matrix.arch }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install dependencies
+              run: pnpm install
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            out/make/**/*.dmg
-            out/make/**/*.zip
-            out/make/**/*.exe
-            out/make/**/*.AppImage
-            out/make/**/*.deb
-            out/make/**/*.rpm
-          if-no-files-found: ignore
+            - name: Build for ${{ matrix.platform }}-${{ matrix.arch }}
+              run: pnpm run make -- --arch=${{ matrix.arch }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.server_url == 'https://github.com'
-    
-    permissions:
-      contents: write
+            - name: Upload artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: release-${{ matrix.platform }}-${{ matrix.arch }}
+                  path: |
+                      out/make/**/*.dmg
+                      out/make/**/*.zip
+                      out/make/**/*.exe
+                      out/make/**/*.AppImage
+                      out/make/**/*.deb
+                      out/make/**/*.rpm
+                  if-no-files-found: ignore
 
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          pattern: release-*
-          merge-multiple: true
+    release:
+        needs: build
+        runs-on: ubuntu-latest
+        if: github.server_url == 'https://github.com'
 
-      - name: List artifacts
-        run: find artifacts -type f | head -50
+        permissions:
+            contents: write
 
-      - name: Create Draft Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          generate_release_notes: true
-          files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.exe
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        steps:
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+                  pattern: release-*
+                  merge-multiple: true
+
+            - name: List artifacts
+              run: find artifacts -type f | head -50
+
+            - name: Create Draft Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  draft: true
+                  generate_release_notes: true
+                  files: |
+                      artifacts/**/*.dmg
+                      artifacts/**/*.zip
+                      artifacts/**/*.exe
+                      artifacts/**/*.AppImage
+                      artifacts/**/*.deb
+                      artifacts/**/*.rpm
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

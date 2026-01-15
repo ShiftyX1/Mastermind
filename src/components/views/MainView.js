@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -54,7 +58,8 @@ export class MainView extends LitElement {
         }
 
         @keyframes blink-red {
-            0%, 100% {
+            0%,
+            100% {
                 border-color: var(--border-color);
             }
             50% {

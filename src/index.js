@@ -36,10 +36,10 @@ app.whenReady().then(async () => {
     setupAIProviderIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
     setupGeneralIpcHandlers();
-    
+
     // Add handler to get log path from renderer
     ipcMain.handle('get-log-path', () => getLogPath());
-    
+
     // Add handler for renderer logs (so they go to the log file)
     ipcMain.on('renderer-log', (event, { level, message }) => {
         const prefix = '[RENDERER]';

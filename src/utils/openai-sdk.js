@@ -297,7 +297,7 @@ async function processAudioChunk(base64Audio, mimeType) {
     // Track first chunk time for duration-based flushing
     if (audioChunks.length === 0) {
         firstChunkTime = now;
-        
+
         // Start periodic transcription timer (Windows needs this)
         if (!windowsTranscriptionTimer && process.platform === 'win32') {
             console.log('Starting Windows periodic transcription timer...');
@@ -355,7 +355,7 @@ async function flushAudioAndTranscribe() {
         // Calculate audio duration
         const bytesPerSample = 2;
         const audioDurationMs = (combinedBuffer.length / bytesPerSample / SAMPLE_RATE) * 1000;
-        
+
         console.log(`Transcribing ${chunkCount} chunks (${audioDurationMs.toFixed(0)}ms of audio)...`);
 
         // Transcribe
@@ -384,7 +384,7 @@ function clearConversation() {
     const systemMessage = conversationMessages.find(m => m.role === 'system');
     conversationMessages = systemMessage ? [systemMessage] : [];
     audioChunks = [];
-    
+
     // Clear timers
     if (silenceCheckTimer) {
         clearTimeout(silenceCheckTimer);
@@ -403,7 +403,7 @@ function closeOpenAISDK() {
     conversationMessages = [];
     audioChunks = [];
     isProcessing = false;
-    
+
     // Clear timers
     if (silenceCheckTimer) {
         clearTimeout(silenceCheckTimer);
@@ -413,7 +413,7 @@ function closeOpenAISDK() {
         clearInterval(windowsTranscriptionTimer);
         windowsTranscriptionTimer = null;
     }
-    
+
     sendToRenderer('update-status', 'Disconnected');
 }
 
@@ -600,7 +600,7 @@ async function startMacOSAudioCapture() {
 
             // Add to audio buffer for transcription
             audioBuffer = Buffer.concat([audioBuffer, monoChunk]);
-            
+
             chunkCount++;
             if (chunkCount % 100 === 0) {
                 console.log(`Audio: ${chunkCount} chunks processed, buffer size: ${audioBuffer.length}`);

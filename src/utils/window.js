@@ -33,10 +33,10 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     const { session, desktopCapturer } = require('electron');
-    
+
     // Store selected source for Windows custom picker
     let selectedSourceId = null;
-    
+
     // Setup display media handler based on platform
     if (process.platform === 'darwin') {
         // macOS: Use native system picker
@@ -553,7 +553,10 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             const primaryDisplay = screen.getPrimaryDisplay();
 
             // Calculate bounds that cover all displays
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            let minX = Infinity,
+                minY = Infinity,
+                maxX = -Infinity,
+                maxY = -Infinity;
             displays.forEach(display => {
                 minX = Math.min(minX, display.bounds.x);
                 minY = Math.min(minY, display.bounds.y);
@@ -712,7 +715,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             regionSelectionWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
 
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
                 ipcMain.once('region-selected', (event, rect) => {
                     if (regionSelectionWindow && !regionSelectionWindow.isDestroyed()) {
                         regionSelectionWindow.close();

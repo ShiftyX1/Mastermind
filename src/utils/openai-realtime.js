@@ -311,7 +311,9 @@ async function sendImageToOpenAI(base64Data, prompt, config) {
     const { apiKey, baseUrl, model } = config;
 
     // OpenAI doesn't support images in Realtime API yet, use standard Chat Completions
-    const apiEndpoint = baseUrl ? `${baseUrl.replace('wss://', 'https://').replace('/v1/realtime', '')}/v1/chat/completions` : 'https://api.openai.com/v1/chat/completions';
+    const apiEndpoint = baseUrl
+        ? `${baseUrl.replace('wss://', 'https://').replace('/v1/realtime', '')}/v1/chat/completions`
+        : 'https://api.openai.com/v1/chat/completions';
 
     try {
         const response = await fetch(apiEndpoint, {
