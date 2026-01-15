@@ -110,6 +110,8 @@ export class CheatingDaddyApp extends LitElement {
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
+        aiProvider: { type: String },
+        modelInfo: { type: Object },
     };
 
     constructor() {
@@ -133,6 +135,8 @@ export class CheatingDaddyApp extends LitElement {
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
         this._storageLoaded = false;
+        this.aiProvider = 'gemini';
+        this.modelInfo = { model: '', visionModel: '', whisperModel: '' };
 
         // Load from storage
         this._loadFromStorage();
@@ -140,9 +144,10 @@ export class CheatingDaddyApp extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [config, prefs] = await Promise.all([
+            const [config, prefs, openaiSdkCreds] = await Promise.all([
                 cheatingDaddy.storage.getConfig(),
-                cheatingDaddy.storage.getPreferences()
+                cheatingDaddy.storage.getPreferences(),
+                cheatingDaddy.storage.getOpenAISDKCredentials()
             ]);
 
             // Check onboarding status
@@ -160,6 +165,14 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
+            
+            // Load AI provider and model info
+            this.aiProvider = prefs.aiProvider || 'gemini';
+            this.modelInfo = {
+                model: openaiSdkCreds.model || 'gpt-4o',
+                visionModel: openaiSdkCreds.visionModel || 'gpt-4o',
+                whisperModel: openaiSdkCreds.whisperModel || 'whisper-1'
+            };
 
             this._storageLoaded = true;
             this.updateLayoutMode();
@@ -487,6 +500,7 @@ export class CheatingDaddyApp extends LitElement {
                         .responses=${this.responses}
                         .currentResponseIndex=${this.currentResponseIndex}
                         .selectedProfile=${this.selectedProfile}
+                        .aiProvider=${this.aiProvider}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         @response-index-changed=${this.handleResponseIndexChanged}
@@ -521,6 +535,8 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
+                        .aiProvider=${this.aiProvider}
+                        .modelInfo=${this.modelInfo}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}

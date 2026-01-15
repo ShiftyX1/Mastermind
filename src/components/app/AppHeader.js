@@ -186,6 +186,82 @@ export class AppHeader extends LitElement {
         .status-tooltip .tooltip-content {
             color: #f14c4c;
         }
+
+        .model-info {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .model-badge {
+            font-size: 10px;
+            color: var(--text-muted);
+            background: var(--key-background);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, monospace;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .model-badge-wrapper {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .model-badge-wrapper .model-tooltip {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: var(--tooltip-bg, #1a1a1a);
+            color: var(--tooltip-text, #ffffff);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0.15s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        .model-badge-wrapper .model-tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            right: 16px;
+            border: 6px solid transparent;
+            border-bottom-color: var(--tooltip-bg, #1a1a1a);
+        }
+
+        .model-badge-wrapper:hover .model-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .model-tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 4px;
+        }
+
+        .model-tooltip-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .model-tooltip-label {
+            opacity: 0.7;
+        }
+
+        .model-tooltip-value {
+            font-family: 'SF Mono', Monaco, monospace;
+        }
     `;
 
     static properties = {
@@ -200,6 +276,8 @@ export class AppHeader extends LitElement {
         onHideToggleClick: { type: Function },
         isClickThrough: { type: Boolean, reflect: true },
         updateAvailable: { type: Boolean },
+        aiProvider: { type: String },
+        modelInfo: { type: Object },
     };
 
     constructor() {
@@ -216,6 +294,8 @@ export class AppHeader extends LitElement {
         this.isClickThrough = false;
         this.updateAvailable = false;
         this._timerInterval = null;
+        this.aiProvider = 'gemini';
+        this.modelInfo = { model: '', visionModel: '', whisperModel: '' };
     }
 
     connectedCallback() {
@@ -337,6 +417,45 @@ export class AppHeader extends LitElement {
         return navigationViews.includes(this.currentView);
     }
 
+    getProviderDisplayName() {
+        const names = {
+            'gemini': 'Gemini',
+            'openai-realtime': 'OpenAI Realtime',
+            'openai-sdk': 'OpenAI SDK'
+        };
+        return names[this.aiProvider] || this.aiProvider;
+    }
+
+    renderModelInfo() {
+        // Only show model info for OpenAI SDK provider
+        if (this.aiProvider !== 'openai-sdk' || !this.modelInfo) {
+            return '';
+        }
+
+        const { model, visionModel, whisperModel } = this.modelInfo;
+        
+        // Show a compact badge with tooltip for model details
+        return html`
+            <div class="model-badge-wrapper">
+                <span class="model-badge" title="Models">${model || 'gpt-4o'}</span>
+                <div class="model-tooltip">
+                    <div class="model-tooltip-row">
+                        <span class="model-tooltip-label">Text</span>
+                        <span class="model-tooltip-value">${model || 'gpt-4o'}</span>
+                    </div>
+                    <div class="model-tooltip-row">
+                        <span class="model-tooltip-label">Vision</span>
+                        <span class="model-tooltip-value">${visionModel || 'gpt-4o'}</span>
+                    </div>
+                    <div class="model-tooltip-row">
+                        <span class="model-tooltip-label">Speech</span>
+                        <span class="model-tooltip-value">${whisperModel || 'whisper-1'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     render() {
         const elapsedTime = this.getElapsedTime();
         const isError = this.statusText && (this.statusText.toLowerCase().includes('error') || this.statusText.toLowerCase().includes('failed'));
@@ -348,6 +467,7 @@ export class AppHeader extends LitElement {
                 <div class="header-actions">
                     ${this.currentView === 'assistant'
                         ? html`
+                              ${this.renderModelInfo()}
                               <span>${elapsedTime}</span>
                               <div class="status-wrapper">
                                   <span class="status-text ${isError ? 'error' : ''}">${shortStatus}</span>
