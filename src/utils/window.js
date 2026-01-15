@@ -64,15 +64,32 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             { useSystemPicker: false } // Disable system picker, use our source directly
         );
     } else if (process.platform === 'win32') {
-        // On Windows, use system picker so user can enable "Share audio" checkbox
-        // This is REQUIRED for system audio capture on Windows
+        // On Windows, use desktopCapturer with loopback audio
+        // This captures system audio via WASAPI without needing user interaction
         session.defaultSession.setDisplayMediaRequestHandler(
-            (request, callback) => {
-                console.log('Windows: Using system picker for screen/audio selection');
-                // Don't call callback - let system picker handle it
-                // The system picker will provide both video and audio if user checks the box
+            async (request, callback) => {
+                try {
+                    console.log('Windows: Getting screen sources with loopback audio...');
+                    const sources = await desktopCapturer.getSources({ 
+                        types: ['screen'],
+                        thumbnailSize: { width: 0, height: 0 }
+                    });
+                    
+                    if (sources.length === 0) {
+                        console.error('No screen sources available on Windows');
+                        callback(null);
+                        return;
+                    }
+                    
+                    console.log('Windows: Using screen source:', sources[0].name, 'with loopback audio');
+                    // 'loopback' enables system audio capture via WASAPI on Windows
+                    callback({ video: sources[0], audio: 'loopback' });
+                } catch (error) {
+                    console.error('Error getting screen sources on Windows:', error);
+                    callback(null);
+                }
             },
-            { useSystemPicker: true }
+            { useSystemPicker: false }
         );
     } else {
         // On Linux, try to get system audio via loopback
