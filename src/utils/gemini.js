@@ -265,8 +265,9 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
                 },
                 onerror: function (e) {
-                    console.log('Session error:', e.message);
-                    sendToRenderer('update-status', 'Error: ' + e.message);
+                    const errorMsg = e?.message || e?.error?.message || 'Session error occurred';
+                    console.log('Session error:', errorMsg, e);
+                    sendToRenderer('update-status', 'Error: ' + errorMsg);
                 },
                 onclose: function (e) {
                     console.log('Session closed:', e.reason);

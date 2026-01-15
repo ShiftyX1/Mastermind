@@ -314,6 +314,40 @@ export class AssistantView extends LitElement {
             opacity: 0.5;
             font-size: 10px;
         }
+
+        .capture-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .region-select-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .region-select-btn:hover {
+            background: var(--hover-background);
+            color: var(--text-color);
+            border-color: var(--text-color);
+        }
+
+        .region-select-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .region-select-btn span {
+            margin-left: 4px;
+        }
     `;
 
     static properties = {
@@ -546,6 +580,14 @@ export class AssistantView extends LitElement {
         }
     }
 
+    handleRegionSelect() {
+        if (window.startRegionSelection) {
+            window.startRegionSelection();
+            // Reload limits after a short delay to catch the update
+            setTimeout(() => this.loadLimits(), 1000);
+        }
+    }
+
     scrollToBottom() {
         setTimeout(() => {
             const container = this.shadowRoot.querySelector('.response-container');
@@ -608,25 +650,33 @@ export class AssistantView extends LitElement {
 
                 <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
-                <div class="screen-answer-btn-wrapper">
-                    <div class="tooltip">
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash</span>
-                            <span class="tooltip-value">${this.flashCount}/20</span>
-                        </div>
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Flash Lite</span>
-                            <span class="tooltip-value">${this.flashLiteCount}/20</span>
-                        </div>
-                        <div class="tooltip-note">Resets every 24 hours</div>
-                    </div>
-                    <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+                <div class="capture-buttons">
+                    <button class="region-select-btn" @click=${this.handleRegionSelect} title="Select region to analyze (like Win+Shift+S)">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                            <path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v2.5A.75.75 0 0 0 3.5 6.75v-2.5a.75.75 0 0 1 .75-.75h2.5A.75.75 0 0 0 6.75 2h-2.5Zm9.5 0a.75.75 0 0 0 0 1.5h2.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 0 1.5 0v-2.5A2.25 2.25 0 0 0 16.25 2h-2.5ZM3.5 13.25a.75.75 0 0 0-1.5 0v2.5A2.25 2.25 0 0 0 4.25 18h2.5a.75.75 0 0 0 0-1.5h-2.5a.75.75 0 0 1-.75-.75v-2.5Zm13.5 0a.75.75 0 0 0 1.5 0v2.5A2.25 2.25 0 0 1 16.25 18h-2.5a.75.75 0 0 1 0-1.5h2.5a.75.75 0 0 0 .75-.75v-2.5Z" clip-rule="evenodd" />
                         </svg>
-                        <span>Analyze screen</span>
-                        <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
+                        <span>Select region</span>
                     </button>
+                    <div class="screen-answer-btn-wrapper">
+                        <div class="tooltip">
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Flash</span>
+                                <span class="tooltip-value">${this.flashCount}/20</span>
+                            </div>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Flash Lite</span>
+                                <span class="tooltip-value">${this.flashLiteCount}/20</span>
+                            </div>
+                            <div class="tooltip-note">Resets every 24 hours</div>
+                        </div>
+                        <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
+                            </svg>
+                            <span>Full screen</span>
+                            <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;

@@ -120,6 +120,72 @@ export class AppHeader extends LitElement {
         .update-button:hover {
             background: rgba(241, 76, 76, 0.1);
         }
+
+        .status-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .status-text {
+            font-size: var(--header-font-size-small);
+            color: var(--text-secondary);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-text.error {
+            color: #f14c4c;
+        }
+
+        .status-tooltip {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: var(--tooltip-bg, #1a1a1a);
+            color: var(--tooltip-text, #ffffff);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            max-width: 300px;
+            word-wrap: break-word;
+            white-space: normal;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0.15s ease;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            line-height: 1.4;
+        }
+
+        .status-tooltip::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            right: 16px;
+            border: 6px solid transparent;
+            border-bottom-color: var(--tooltip-bg, #1a1a1a);
+        }
+
+        .status-wrapper:hover .status-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .status-tooltip .tooltip-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            opacity: 0.6;
+            margin-bottom: 4px;
+        }
+
+        .status-tooltip .tooltip-content {
+            color: #f14c4c;
+        }
     `;
 
     static properties = {
@@ -273,6 +339,8 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
+        const isError = this.statusText && (this.statusText.toLowerCase().includes('error') || this.statusText.toLowerCase().includes('failed'));
+        const shortStatus = isError ? 'Error' : this.statusText;
 
         return html`
             <div class="header">
@@ -281,7 +349,15 @@ export class AppHeader extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <span>${elapsedTime}</span>
-                              <span>${this.statusText}</span>
+                              <div class="status-wrapper">
+                                  <span class="status-text ${isError ? 'error' : ''}">${shortStatus}</span>
+                                  ${isError ? html`
+                                      <div class="status-tooltip">
+                                          <div class="tooltip-label">Error Details</div>
+                                          <div class="tooltip-content">${this.statusText}</div>
+                                      </div>
+                                  ` : ''}
+                              </div>
                               ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
                           `
                         : ''}

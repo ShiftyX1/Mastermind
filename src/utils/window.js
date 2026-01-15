@@ -33,14 +33,59 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     const { session, desktopCapturer } = require('electron');
-    session.defaultSession.setDisplayMediaRequestHandler(
-        (request, callback) => {
-            desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
-            });
-        },
-        { useSystemPicker: true }
-    );
+    
+    // Setup display media request handler for screen capture
+    // On macOS, use system picker for better UX
+    if (process.platform === 'darwin') {
+        session.defaultSession.setDisplayMediaRequestHandler(
+            async (request, callback) => {
+                try {
+                    const sources = await desktopCapturer.getSources({ 
+                        types: ['screen'],
+                        thumbnailSize: { width: 0, height: 0 } // Skip thumbnail generation for speed
+                    });
+                    
+                    if (sources.length === 0) {
+                        console.error('No screen sources available');
+                        callback(null);
+                        return;
+                    }
+                    
+                    // On macOS, directly use the first screen (system already granted permission)
+                    console.log('Screen capture source:', sources[0].name);
+                    callback({ video: sources[0], audio: 'loopback' });
+                } catch (error) {
+                    console.error('Error getting screen sources:', error);
+                    callback(null);
+                }
+            },
+            { useSystemPicker: false } // Disable system picker, use our source directly
+        );
+    } else {
+        // On other platforms, use the system picker
+        session.defaultSession.setDisplayMediaRequestHandler(
+            async (request, callback) => {
+                try {
+                    const sources = await desktopCapturer.getSources({ 
+                        types: ['screen'],
+                        thumbnailSize: { width: 0, height: 0 }
+                    });
+                    
+                    if (sources.length === 0) {
+                        console.error('No screen sources available');
+                        callback(null);
+                        return;
+                    }
+                    
+                    callback({ video: sources[0], audio: 'loopback' });
+                } catch (error) {
+                    console.error('Error getting screen sources:', error);
+                    callback(null);
+                }
+            },
+            { useSystemPicker: true }
+        );
+    }
 
     mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
@@ -490,6 +535,221 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             return { success: true };
         } catch (error) {
             console.error('Error updating sizes:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Region selection window for capturing areas outside the main window
+    let regionSelectionWindow = null;
+
+    ipcMain.handle('start-region-selection', async (event, { screenshotDataUrl }) => {
+        try {
+            // Hide main window first
+            const wasVisible = mainWindow.isVisible();
+            if (wasVisible) {
+                mainWindow.hide();
+            }
+
+            // Small delay to ensure window is hidden
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Get all displays to cover all screens
+            const displays = screen.getAllDisplays();
+            const primaryDisplay = screen.getPrimaryDisplay();
+
+            // Calculate bounds that cover all displays
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            displays.forEach(display => {
+                minX = Math.min(minX, display.bounds.x);
+                minY = Math.min(minY, display.bounds.y);
+                maxX = Math.max(maxX, display.bounds.x + display.bounds.width);
+                maxY = Math.max(maxY, display.bounds.y + display.bounds.height);
+            });
+
+            const totalWidth = maxX - minX;
+            const totalHeight = maxY - minY;
+
+            // Create fullscreen transparent window for selection
+            regionSelectionWindow = new BrowserWindow({
+                x: minX,
+                y: minY,
+                width: totalWidth,
+                height: totalHeight,
+                frame: false,
+                transparent: true,
+                alwaysOnTop: true,
+                skipTaskbar: true,
+                resizable: false,
+                movable: false,
+                hasShadow: false,
+                webPreferences: {
+                    nodeIntegration: true,
+                    contextIsolation: false,
+                },
+            });
+
+            regionSelectionWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+
+            // Create HTML content for selection overlay
+            const htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body {
+                            width: 100vw;
+                            height: 100vh;
+                            cursor: crosshair;
+                            overflow: hidden;
+                            position: relative;
+                        }
+                        #screenshot {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                        }
+                        #overlay {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            background: rgba(0, 0, 0, 0.3);
+                        }
+                        #selection {
+                            position: absolute;
+                            border: 2px dashed #fff;
+                            background: rgba(255, 255, 255, 0.1);
+                            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+                            display: none;
+                            pointer-events: none;
+                        }
+                        #hint {
+                            position: fixed;
+                            top: 20px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: rgba(0, 0, 0, 0.8);
+                            color: white;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                            font-size: 14px;
+                            z-index: 10000;
+                            pointer-events: none;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <img id="screenshot" src="${screenshotDataUrl}" />
+                    <div id="overlay"></div>
+                    <div id="selection"></div>
+                    <div id="hint">Click and drag to select region • ESC to cancel</div>
+                    <script>
+                        const { ipcRenderer } = require('electron');
+                        const selection = document.getElementById('selection');
+                        const overlay = document.getElementById('overlay');
+                        let isSelecting = false;
+                        let startX = 0, startY = 0;
+
+                        document.addEventListener('mousedown', (e) => {
+                            if (e.button !== 0) return;
+                            isSelecting = true;
+                            startX = e.clientX;
+                            startY = e.clientY;
+                            selection.style.display = 'block';
+                            selection.style.left = startX + 'px';
+                            selection.style.top = startY + 'px';
+                            selection.style.width = '0px';
+                            selection.style.height = '0px';
+                        });
+
+                        document.addEventListener('mousemove', (e) => {
+                            if (!isSelecting) return;
+                            const currentX = e.clientX;
+                            const currentY = e.clientY;
+                            const left = Math.min(startX, currentX);
+                            const top = Math.min(startY, currentY);
+                            const width = Math.abs(currentX - startX);
+                            const height = Math.abs(currentY - startY);
+                            selection.style.left = left + 'px';
+                            selection.style.top = top + 'px';
+                            selection.style.width = width + 'px';
+                            selection.style.height = height + 'px';
+                        });
+
+                        document.addEventListener('mouseup', (e) => {
+                            if (!isSelecting) return;
+                            isSelecting = false;
+                            const rect = {
+                                left: parseInt(selection.style.left),
+                                top: parseInt(selection.style.top),
+                                width: parseInt(selection.style.width),
+                                height: parseInt(selection.style.height)
+                            };
+                            if (rect.width > 10 && rect.height > 10) {
+                                ipcRenderer.send('region-selected', rect);
+                            } else {
+                                ipcRenderer.send('region-selection-cancelled');
+                            }
+                        });
+
+                        document.addEventListener('keydown', (e) => {
+                            if (e.key === 'Escape') {
+                                ipcRenderer.send('region-selection-cancelled');
+                            }
+                        });
+                    </script>
+                </body>
+                </html>
+            `;
+
+            regionSelectionWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+
+            return new Promise((resolve) => {
+                ipcMain.once('region-selected', (event, rect) => {
+                    if (regionSelectionWindow && !regionSelectionWindow.isDestroyed()) {
+                        regionSelectionWindow.close();
+                        regionSelectionWindow = null;
+                    }
+                    if (wasVisible) {
+                        mainWindow.showInactive();
+                    }
+                    resolve({ success: true, rect });
+                });
+
+                ipcMain.once('region-selection-cancelled', () => {
+                    if (regionSelectionWindow && !regionSelectionWindow.isDestroyed()) {
+                        regionSelectionWindow.close();
+                        regionSelectionWindow = null;
+                    }
+                    if (wasVisible) {
+                        mainWindow.showInactive();
+                    }
+                    resolve({ success: false, cancelled: true });
+                });
+
+                // Also handle window close
+                regionSelectionWindow.on('closed', () => {
+                    regionSelectionWindow = null;
+                    if (wasVisible && !mainWindow.isDestroyed()) {
+                        mainWindow.showInactive();
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error starting region selection:', error);
+            if (regionSelectionWindow && !regionSelectionWindow.isDestroyed()) {
+                regionSelectionWindow.close();
+                regionSelectionWindow = null;
+            }
+            if (!mainWindow.isDestroyed()) {
+                mainWindow.showInactive();
+            }
             return { success: false, error: error.message };
         }
     });

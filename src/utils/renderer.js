@@ -153,7 +153,7 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     if (success) {
         cheatingDaddy.setStatus('Live');
     } else {
-        cheatingDaddy.setStatus('error');
+        cheatingDaddy.setStatus('Error: Failed to initialize AI session Gemini');
     }
 }
 
@@ -329,7 +329,21 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
         console.error('Error starting capture:', err);
-        cheatingDaddy.setStatus('error');
+        
+        // Provide more helpful error messages based on error type
+        let errorMessage = err.message || 'Failed to start capture';
+        
+        if (errorMessage.toLowerCase().includes('timeout')) {
+            errorMessage = 'Screen capture timed out. Please try again and select a screen quickly.';
+        } else if (errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('denied')) {
+            errorMessage = 'Screen capture permission denied. Please grant screen recording permission in System Settings.';
+        } else if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('no sources')) {
+            errorMessage = 'No screen sources found. Please ensure a display is connected.';
+        } else if (errorMessage.toLowerCase().includes('aborted') || errorMessage.toLowerCase().includes('cancel')) {
+            errorMessage = 'Screen selection was cancelled. Please try again.';
+        }
+        
+        cheatingDaddy.setStatus('Error: ' + errorMessage);
     }
 }
 
@@ -518,10 +532,193 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     );
 }
 
-const MANUAL_SCREENSHOT_PROMPT = `Help me on this page, give me the answer no bs, complete answer.
-So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
-If its a question about the website, give me the answer no bs, complete answer.
-If its a mcq question, give me the answer no bs, complete answer.`;
+const MANUAL_SCREENSHOT_PROMPT = `You are an expert AI assistant analyzing a screenshot. Your task is to understand what the user needs help with and provide the most useful response.
+
+**ANALYSIS APPROACH:**
+1. First, identify what's shown on the screen (code editor, math problem, website, document, exam, etc.)
+2. Determine what the user likely needs (explanation, solution, answer, debugging help, etc.)
+3. Provide a direct, actionable response
+
+**RESPONSE GUIDELINES BY CONTEXT:**
+
+**If it's CODE (LeetCode, HackerRank, coding interview, IDE):**
+- Identify the programming language and problem type
+- Provide a brief explanation of the approach (2-3 bullet points max)
+- Give the complete, working code solution
+- Include time/space complexity if relevant
+- If there's an error, explain the fix
+
+**If it's MATH or SCIENCE:**
+- Show step-by-step solution
+- Use proper mathematical notation with LaTeX ($..$ for inline, $$...$$ for blocks)
+- Provide the final answer clearly marked
+- Include any relevant formulas used
+
+**If it's MCQ/EXAM/QUIZ:**
+- State the correct answer immediately and clearly (e.g., "**Answer: B**")
+- Provide brief justification (1-2 sentences)
+- If multiple questions visible, answer all of them
+
+**If it's a DOCUMENT/ARTICLE/WEBSITE:**
+- Summarize the key information
+- Answer any specific questions if apparent
+- Highlight important points
+
+**If it's a FORM/APPLICATION:**
+- Help fill in the required information
+- Suggest appropriate responses
+- Point out any issues or missing fields
+
+**If it's an ERROR/DEBUG scenario:**
+- Identify the error type and cause
+- Provide the fix immediately
+- Explain briefly why it occurred
+
+**FORMAT REQUIREMENTS:**
+- Use **markdown** for formatting
+- Use **bold** for key answers and important points
+- Use code blocks with language specification for code
+- Be concise but complete - no unnecessary explanations
+- No pleasantries or filler text - get straight to the answer
+
+**CRITICAL:** Provide the complete answer. Don't ask for clarification - make reasonable assumptions and deliver value immediately.`;
+
+// ============ REGION SELECTION ============
+// Uses a separate fullscreen window to allow selection outside the app window
+
+async function startRegionSelection() {
+    console.log('Starting region selection...');
+
+    if (!mediaStream) {
+        console.error('No media stream available. Please start capture first.');
+        cheatingDaddy?.addNewResponse('Please start screen capture first before selecting a region.');
+        return;
+    }
+
+    // Ensure video is ready
+    if (!hiddenVideo) {
+        hiddenVideo = document.createElement('video');
+        hiddenVideo.srcObject = mediaStream;
+        hiddenVideo.muted = true;
+        hiddenVideo.playsInline = true;
+        await hiddenVideo.play();
+
+        await new Promise(resolve => {
+            if (hiddenVideo.readyState >= 2) return resolve();
+            hiddenVideo.onloadedmetadata = () => resolve();
+        });
+
+        // Initialize canvas
+        offscreenCanvas = document.createElement('canvas');
+        offscreenCanvas.width = hiddenVideo.videoWidth;
+        offscreenCanvas.height = hiddenVideo.videoHeight;
+        offscreenContext = offscreenCanvas.getContext('2d');
+    }
+
+    if (hiddenVideo.readyState < 2) {
+        console.warn('Video not ready yet');
+        return;
+    }
+
+    // Capture current screen to show in selection window
+    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    const screenshotDataUrl = offscreenCanvas.toDataURL('image/jpeg', 0.9);
+
+    // Request main process to create selection window
+    const result = await ipcRenderer.invoke('start-region-selection', { screenshotDataUrl });
+
+    if (result.success && result.rect) {
+        // Capture the selected region from the screenshot
+        await captureRegionFromScreenshot(result.rect, screenshotDataUrl);
+    } else if (result.cancelled) {
+        console.log('Region selection cancelled');
+    } else if (result.error) {
+        console.error('Region selection error:', result.error);
+    }
+}
+
+async function captureRegionFromScreenshot(rect, screenshotDataUrl) {
+    console.log('Capturing region from screenshot:', rect);
+
+    // Load the screenshot into an image
+    const img = new Image();
+    img.src = screenshotDataUrl;
+
+    await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+    });
+
+    // Calculate scale factor (screenshot might have different resolution than display)
+    // The selection coordinates are in screen pixels, we need to map to image pixels
+    const scaleX = img.naturalWidth / window.screen.width;
+    const scaleY = img.naturalHeight / window.screen.height;
+
+    // Scale the selection rectangle
+    const scaledRect = {
+        left: Math.round(rect.left * scaleX),
+        top: Math.round(rect.top * scaleY),
+        width: Math.round(rect.width * scaleX),
+        height: Math.round(rect.height * scaleY),
+    };
+
+    // Create canvas for the cropped region
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = scaledRect.width;
+    cropCanvas.height = scaledRect.height;
+    const cropContext = cropCanvas.getContext('2d');
+
+    // Draw only the selected region
+    cropContext.drawImage(
+        img,
+        scaledRect.left,
+        scaledRect.top,
+        scaledRect.width,
+        scaledRect.height,
+        0,
+        0,
+        scaledRect.width,
+        scaledRect.height
+    );
+
+    // Convert to blob and send
+    cropCanvas.toBlob(
+        async blob => {
+            if (!blob) {
+                console.error('Failed to create blob from cropped region');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64data = reader.result.split(',')[1];
+
+                if (!base64data || base64data.length < 100) {
+                    console.error('Invalid base64 data generated');
+                    return;
+                }
+
+                const result = await ipcRenderer.invoke('send-image-content', {
+                    data: base64data,
+                    prompt: MANUAL_SCREENSHOT_PROMPT,
+                });
+
+                if (result.success) {
+                    console.log(`Region capture response completed from ${result.model}`);
+                } else {
+                    console.error('Failed to get region capture response:', result.error);
+                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                }
+            };
+            reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        0.9
+    );
+}
+
+// Expose to global scope
+window.startRegionSelection = startRegionSelection;
 
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
