@@ -35,88 +35,15 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     const { session, desktopCapturer } = require('electron');
     
     // Setup display media request handler for screen capture
-    if (process.platform === 'darwin') {
-        // On macOS, use SystemAudioDump for audio (not browser loopback)
-        // So we just need to capture the screen
-        session.defaultSession.setDisplayMediaRequestHandler(
-            async (request, callback) => {
-                try {
-                    const sources = await desktopCapturer.getSources({ 
-                        types: ['screen'],
-                        thumbnailSize: { width: 0, height: 0 } // Skip thumbnail generation for speed
-                    });
-                    
-                    if (sources.length === 0) {
-                        console.error('No screen sources available');
-                        callback(null);
-                        return;
-                    }
-                    
-                    // On macOS, directly use the first screen (system already granted permission)
-                    // Audio is handled separately by SystemAudioDump
-                    console.log('Screen capture source:', sources[0].name);
-                    callback({ video: sources[0], audio: 'loopback' });
-                } catch (error) {
-                    console.error('Error getting screen sources:', error);
-                    callback(null);
-                }
-            },
-            { useSystemPicker: false } // Disable system picker, use our source directly
-        );
-    } else if (process.platform === 'win32') {
-        // On Windows, use desktopCapturer with loopback audio
-        // This captures system audio via WASAPI without needing user interaction
-        session.defaultSession.setDisplayMediaRequestHandler(
-            async (request, callback) => {
-                try {
-                    console.log('Windows: Getting screen sources with loopback audio...');
-                    const sources = await desktopCapturer.getSources({ 
-                        types: ['screen'],
-                        thumbnailSize: { width: 0, height: 0 }
-                    });
-                    
-                    if (sources.length === 0) {
-                        console.error('No screen sources available on Windows');
-                        callback(null);
-                        return;
-                    }
-                    
-                    console.log('Windows: Using screen source:', sources[0].name, 'with loopback audio');
-                    // 'loopback' enables system audio capture via WASAPI on Windows
-                    callback({ video: sources[0], audio: 'loopback' });
-                } catch (error) {
-                    console.error('Error getting screen sources on Windows:', error);
-                    callback(null);
-                }
-            },
-            { useSystemPicker: false }
-        );
-    } else {
-        // On Linux, try to get system audio via loopback
-        session.defaultSession.setDisplayMediaRequestHandler(
-            async (request, callback) => {
-                try {
-                    const sources = await desktopCapturer.getSources({ 
-                        types: ['screen'],
-                        thumbnailSize: { width: 0, height: 0 }
-                    });
-                    
-                    if (sources.length === 0) {
-                        console.error('No screen sources available');
-                        callback(null);
-                        return;
-                    }
-                    
-                    console.log('Linux: Using screen source with loopback audio');
-                    callback({ video: sources[0], audio: 'loopback' });
-                } catch (error) {
-                    console.error('Error getting screen sources:', error);
-                    callback(null);
-                }
-            },
-            { useSystemPicker: false }
-        );
-    }
+    // Use system picker on all platforms to let user choose screen/window and audio
+    session.defaultSession.setDisplayMediaRequestHandler(
+        (request, callback) => {
+            // Don't call callback - let system picker handle the selection
+            // The system will call callback with user's choice
+            console.log('Showing system screen picker dialog...');
+        },
+        { useSystemPicker: true }
+    );
 
     mainWindow.setResizable(false);
     mainWindow.setContentProtection(true);
