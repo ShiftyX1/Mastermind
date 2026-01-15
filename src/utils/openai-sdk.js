@@ -281,6 +281,7 @@ async function sendImageMessage(base64Image, prompt) {
 let audioChunks = [];
 let lastAudioTime = 0;
 const SILENCE_THRESHOLD_MS = 1500; // 1.5 seconds of silence
+let silenceCheckTimer = null;
 
 async function processAudioChunk(base64Audio, mimeType) {
     if (!openaiClient) {
@@ -294,8 +295,20 @@ async function processAudioChunk(base64Audio, mimeType) {
     audioChunks.push(buffer);
     lastAudioTime = now;
 
-    // Check for silence (no new audio for SILENCE_THRESHOLD_MS)
-    // This is a simple approach - in production you'd want proper VAD
+    // Clear existing timer
+    if (silenceCheckTimer) {
+        clearTimeout(silenceCheckTimer);
+    }
+
+    // Set timer to check for silence
+    silenceCheckTimer = setTimeout(async () => {
+        const silenceDuration = Date.now() - lastAudioTime;
+        if (silenceDuration >= SILENCE_THRESHOLD_MS && audioChunks.length > 0) {
+            console.log('Silence detected, flushing audio for transcription...');
+            await flushAudioAndTranscribe();
+        }
+    }, SILENCE_THRESHOLD_MS);
+
     return { success: true, buffering: true };
 }
 
