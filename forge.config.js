@@ -1,5 +1,7 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const path = require('path');
+const fs = require('fs');
 
 module.exports = {
     packagerConfig: {
@@ -7,18 +9,37 @@ module.exports = {
         extraResource: ['./src/assets/SystemAudioDump'],
         name: 'Cheating Daddy',
         icon: 'src/assets/logo',
+        // Fix executable permissions after packaging
+        afterCopy: [
+            (buildPath, electronVersion, platform, arch, callback) => {
+                if (platform === 'darwin') {
+                    const systemAudioDump = path.join(buildPath, '..', 'Resources', 'SystemAudioDump');
+                    if (fs.existsSync(systemAudioDump)) {
+                        try {
+                            fs.chmodSync(systemAudioDump, 0o755);
+                            console.log('✓ Set executable permissions for SystemAudioDump');
+                        } catch (err) {
+                            console.error('✗ Failed to set permissions:', err.message);
+                        }
+                    } else {
+                        console.warn('SystemAudioDump not found at:', systemAudioDump);
+                    }
+                }
+                callback();
+            },
+        ],
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
-        // also fuck apple
-        // osxSign: {
-        //    identity: '<paste your identity here>',
-        //   optionsForFile: (filePath) => {
-        //       return {
-        //           entitlements: 'entitlements.plist',
-        //       };
-        //   },
-        // },
-        // notarize if off cuz i ran this for 6 hours and it still didnt finish
+        // Use ad-hoc signing with entitlements for local development
+        osxSign: {
+            identity: '-', // ad-hoc signing (no Apple Developer account needed)
+            optionsForFile: (filePath) => {
+                return {
+                    entitlements: 'entitlements.plist',
+                };
+            },
+        },
+        // notarize is off - requires Apple Developer account
         // osxNotarize: {
         //    appleId: 'your apple id',
         //    appleIdPassword: 'app specific password',

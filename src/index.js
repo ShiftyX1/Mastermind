@@ -6,6 +6,7 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupAIProviderIpcHandlers } = require('./utils/ai-provider-manager');
 const { stopMacOSAudioCapture } = require('./utils/gemini');
+const { initLogger, closeLogger, getLogPath } = require('./utils/logger');
 const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
@@ -24,6 +25,10 @@ function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
+    // Initialize file logger first
+    const logPath = initLogger();
+    console.log('App starting, log file:', logPath);
+
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
 
@@ -31,10 +36,14 @@ app.whenReady().then(async () => {
     setupAIProviderIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
     setupGeneralIpcHandlers();
+    
+    // Add handler to get log path from renderer
+    ipcMain.handle('get-log-path', () => getLogPath());
 });
 
 app.on('window-all-closed', () => {
     stopMacOSAudioCapture();
+    closeLogger();
     if (process.platform !== 'darwin') {
         app.quit();
     }
@@ -42,6 +51,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
+    closeLogger();
 });
 
 app.on('activate', () => {
@@ -282,6 +292,18 @@ function setupStorageIpcHandlers() {
 function setupGeneralIpcHandlers() {
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
+    });
+
+    ipcMain.handle('open-logs-folder', async () => {
+        try {
+            const logPath = getLogPath();
+            const logsDir = require('path').dirname(logPath);
+            await shell.openPath(logsDir);
+            return { success: true, path: logsDir };
+        } catch (error) {
+            console.error('Error opening logs folder:', error);
+            return { success: false, error: error.message };
+        }
     });
 
     ipcMain.handle('quit-application', async event => {

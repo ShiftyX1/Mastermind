@@ -441,9 +441,11 @@ async function startMacOSAudioCapture() {
     // Kill any existing SystemAudioDump processes first
     await killExistingSystemAudioDump();
 
-    console.log('Starting macOS audio capture with SystemAudioDump for OpenAI SDK...');
+    console.log('=== Starting macOS audio capture (OpenAI SDK) ===');
+    sendToRenderer('update-status', 'Starting audio capture...');
 
     const { app } = require('electron');
+    const fs = require('fs');
 
     let systemAudioPath;
     if (app.isPackaged) {
@@ -452,7 +454,35 @@ async function startMacOSAudioCapture() {
         systemAudioPath = path.join(__dirname, '../assets', 'SystemAudioDump');
     }
 
-    console.log('SystemAudioDump path:', systemAudioPath);
+    console.log('SystemAudioDump config:', {
+        path: systemAudioPath,
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        exists: fs.existsSync(systemAudioPath),
+    });
+
+    // Check if file exists
+    if (!fs.existsSync(systemAudioPath)) {
+        console.error('FATAL: SystemAudioDump not found at:', systemAudioPath);
+        sendToRenderer('update-status', 'Error: Audio binary not found');
+        return false;
+    }
+
+    // Check and fix executable permissions
+    try {
+        fs.accessSync(systemAudioPath, fs.constants.X_OK);
+        console.log('SystemAudioDump is executable');
+    } catch (err) {
+        console.warn('SystemAudioDump not executable, fixing permissions...');
+        try {
+            fs.chmodSync(systemAudioPath, 0o755);
+            console.log('Fixed executable permissions');
+        } catch (chmodErr) {
+            console.error('Failed to fix permissions:', chmodErr);
+            sendToRenderer('update-status', 'Error: Cannot execute audio binary');
+            return false;
+        }
+    }
 
     const spawnOptions = {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -461,10 +491,12 @@ async function startMacOSAudioCapture() {
         },
     };
 
+    console.log('Spawning SystemAudioDump...');
     systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
 
     if (!systemAudioProc.pid) {
-        console.error('Failed to start SystemAudioDump');
+        console.error('FATAL: Failed to start SystemAudioDump - no PID');
+        sendToRenderer('update-status', 'Error: Audio capture failed to start');
         return false;
     }
 
@@ -476,8 +508,16 @@ async function startMacOSAudioCapture() {
     const CHUNK_SIZE = SAMPLE_RATE * BYTES_PER_SAMPLE * CHANNELS * CHUNK_DURATION;
 
     let tempBuffer = Buffer.alloc(0);
+    let chunkCount = 0;
+    let firstDataReceived = false;
 
     systemAudioProc.stdout.on('data', data => {
+        if (!firstDataReceived) {
+            firstDataReceived = true;
+            console.log('First audio data received! Size:', data.length);
+            sendToRenderer('update-status', 'Listening...');
+        }
+
         tempBuffer = Buffer.concat([tempBuffer, data]);
 
         while (tempBuffer.length >= CHUNK_SIZE) {
@@ -489,6 +529,11 @@ async function startMacOSAudioCapture() {
 
             // Add to audio buffer for transcription
             audioBuffer = Buffer.concat([audioBuffer, monoChunk]);
+            
+            chunkCount++;
+            if (chunkCount % 100 === 0) {
+                console.log(`Audio: ${chunkCount} chunks processed, buffer size: ${audioBuffer.length}`);
+            }
         }
 
         // Limit buffer size (max 30 seconds of audio)
@@ -499,19 +544,31 @@ async function startMacOSAudioCapture() {
     });
 
     systemAudioProc.stderr.on('data', data => {
-        console.error('SystemAudioDump stderr:', data.toString());
+        const msg = data.toString();
+        console.error('SystemAudioDump stderr:', msg);
+        if (msg.toLowerCase().includes('error')) {
+            sendToRenderer('update-status', 'Audio error: ' + msg.substring(0, 50));
+        }
     });
 
-    systemAudioProc.on('close', code => {
-        console.log('SystemAudioDump process closed with code:', code);
+    systemAudioProc.on('close', (code, signal) => {
+        console.log('SystemAudioDump closed:', { code, signal, chunksProcessed: chunkCount, tempBufferSize: tempBuffer.length });
+        if (code !== 0 && code !== null) {
+            sendToRenderer('update-status', `Audio stopped (exit: ${code}, signal: ${signal})`);
+        }
         systemAudioProc = null;
         stopTranscriptionTimer();
     });
 
     systemAudioProc.on('error', err => {
-        console.error('SystemAudioDump process error:', err);
+        console.error('SystemAudioDump spawn error:', err.message, err.stack);
+        sendToRenderer('update-status', 'Audio error: ' + err.message);
         systemAudioProc = null;
         stopTranscriptionTimer();
+    });
+
+    systemAudioProc.on('exit', (code, signal) => {
+        console.log('SystemAudioDump exit event:', { code, signal });
     });
 
     // Start periodic transcription

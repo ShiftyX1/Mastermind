@@ -170,6 +170,25 @@ export class HelpView extends LitElement {
             flex-shrink: 0;
         }
 
+        .open-logs-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-color);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .open-logs-btn:hover {
+            background: var(--hover-background);
+        }
+
         .usage-steps {
             counter-reset: step-counter;
         }
@@ -442,8 +461,32 @@ export class HelpView extends LitElement {
                     </div>
                     <div class="description">The AI listens to conversations and provides contextual assistance based on what it hears.</div>
                 </div>
+
+                <div class="option-group">
+                    <div class="option-label">
+                        <span>Troubleshooting</span>
+                    </div>
+                    <div class="description" style="margin-bottom: 12px;">
+                        If you're experiencing issues with audio capture or other features, check the application logs for diagnostic information.
+                    </div>
+                    <button class="open-logs-btn" @click=${this.openLogsFolder}>
+                        📁 Open Logs Folder
+                    </button>
+                </div>
             </div>
         `;
+    }
+
+    async openLogsFolder() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('open-logs-folder');
+            if (!result.success) {
+                console.error('Failed to open logs folder:', result.error);
+            }
+        } catch (err) {
+            console.error('Error opening logs folder:', err);
+        }
     }
 }
 
