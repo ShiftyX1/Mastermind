@@ -33,14 +33,11 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     const { session, desktopCapturer } = require('electron');
-    
-    // Setup display media request handler for screen capture
-    // Use system picker on all platforms to let user choose screen/window and audio
     session.defaultSession.setDisplayMediaRequestHandler(
         (request, callback) => {
-            // Don't call callback - let system picker handle the selection
-            // The system will call callback with user's choice
-            console.log('Showing system screen picker dialog...');
+            desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
+                callback({ video: sources[0], audio: 'loopback' });
+            });
         },
         { useSystemPicker: true }
     );
