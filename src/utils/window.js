@@ -35,8 +35,9 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     const { session, desktopCapturer } = require('electron');
     
     // Setup display media request handler for screen capture
-    // On macOS, use system picker for better UX
     if (process.platform === 'darwin') {
+        // On macOS, use SystemAudioDump for audio (not browser loopback)
+        // So we just need to capture the screen
         session.defaultSession.setDisplayMediaRequestHandler(
             async (request, callback) => {
                 try {
@@ -52,6 +53,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
                     }
                     
                     // On macOS, directly use the first screen (system already granted permission)
+                    // Audio is handled separately by SystemAudioDump
                     console.log('Screen capture source:', sources[0].name);
                     callback({ video: sources[0], audio: 'loopback' });
                 } catch (error) {
@@ -61,8 +63,19 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             },
             { useSystemPicker: false } // Disable system picker, use our source directly
         );
+    } else if (process.platform === 'win32') {
+        // On Windows, use system picker so user can enable "Share audio" checkbox
+        // This is REQUIRED for system audio capture on Windows
+        session.defaultSession.setDisplayMediaRequestHandler(
+            (request, callback) => {
+                console.log('Windows: Using system picker for screen/audio selection');
+                // Don't call callback - let system picker handle it
+                // The system picker will provide both video and audio if user checks the box
+            },
+            { useSystemPicker: true }
+        );
     } else {
-        // On other platforms, use the system picker
+        // On Linux, try to get system audio via loopback
         session.defaultSession.setDisplayMediaRequestHandler(
             async (request, callback) => {
                 try {
@@ -77,13 +90,14 @@ function createWindow(sendToRenderer, geminiSessionRef) {
                         return;
                     }
                     
+                    console.log('Linux: Using screen source with loopback audio');
                     callback({ video: sources[0], audio: 'loopback' });
                 } catch (error) {
                     console.error('Error getting screen sources:', error);
                     callback(null);
                 }
             },
-            { useSystemPicker: true }
+            { useSystemPicker: false }
         );
     }
 

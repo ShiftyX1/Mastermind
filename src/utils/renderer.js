@@ -18,6 +18,23 @@ let currentImageQuality = 'medium'; // Store current image quality for manual sc
 
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
+const isWindows = process.platform === 'win32';
+
+// Send logs to main process for file logging
+function logToMain(level, ...args) {
+    const message = args.map(arg => {
+        if (typeof arg === 'object') {
+            try { return JSON.stringify(arg); } catch { return String(arg); }
+        }
+        return String(arg);
+    }).join(' ');
+    ipcRenderer.send('renderer-log', { level, message });
+    
+    // Also log to console
+    if (level === 'error') console.error(...args);
+    else if (level === 'warn') console.warn(...args);
+    else console.log(...args);
+}
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access
@@ -278,6 +295,9 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
             // Windows - use display media with loopback for system audio
+            logToMain('info', '=== Starting Windows audio capture ===');
+            cheatingDaddy.setStatus('Requesting screen & audio...');
+            
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     frameRate: 1,
@@ -293,10 +313,29 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 },
             });
 
-            console.log('Windows capture started with loopback audio');
+            const audioTracks = mediaStream.getAudioTracks();
+            const videoTracks = mediaStream.getVideoTracks();
+            
+            logToMain('info', 'Windows capture result:', {
+                hasVideo: videoTracks.length > 0,
+                hasAudio: audioTracks.length > 0,
+                audioTrackInfo: audioTracks.map(t => ({ 
+                    label: t.label, 
+                    enabled: t.enabled, 
+                    muted: t.muted,
+                    readyState: t.readyState,
+                    settings: t.getSettings()
+                })),
+            });
 
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
+            if (audioTracks.length === 0) {
+                logToMain('warn', 'WARNING: No audio tracks! User must check "Share audio" in screen picker dialog');
+                cheatingDaddy.setStatus('Warning: No audio - enable "Share audio" checkbox');
+            } else {
+                logToMain('info', 'Audio track acquired, setting up processing...');
+                // Setup audio processing for Windows loopback audio only
+                setupWindowsLoopbackProcessing();
+            }
 
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
@@ -412,32 +451,73 @@ function setupLinuxSystemAudioProcessing() {
 
 function setupWindowsLoopbackProcessing() {
     // Setup audio processing for Windows loopback audio only
-    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const source = audioContext.createMediaStreamSource(mediaStream);
-    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-
-    let audioBuffer = [];
-    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
-
-    audioProcessor.onaudioprocess = async e => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
-
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
-
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
+    logToMain('info', 'Setting up Windows loopback audio processing...');
+    
+    try {
+        audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+        
+        logToMain('info', 'AudioContext created:', {
+            state: audioContext.state,
+            sampleRate: audioContext.sampleRate,
+        });
+        
+        // Resume AudioContext if suspended (Chrome policy)
+        if (audioContext.state === 'suspended') {
+            logToMain('warn', 'AudioContext suspended, attempting resume...');
+            audioContext.resume().then(() => {
+                logToMain('info', 'AudioContext resumed successfully');
+            }).catch(err => {
+                logToMain('error', 'Failed to resume AudioContext:', err.message);
             });
         }
-    };
+        
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    source.connect(audioProcessor);
-    audioProcessor.connect(audioContext.destination);
+        let audioBuffer = [];
+        const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+        let chunkCount = 0;
+        let totalSamples = 0;
+
+        audioProcessor.onaudioprocess = async e => {
+            const inputData = e.inputBuffer.getChannelData(0);
+            audioBuffer.push(...inputData);
+            totalSamples += inputData.length;
+
+            // Process audio in chunks
+            while (audioBuffer.length >= samplesPerChunk) {
+                const chunk = audioBuffer.splice(0, samplesPerChunk);
+                const pcmData16 = convertFloat32ToInt16(chunk);
+                const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+                await ipcRenderer.invoke('send-audio-content', {
+                    data: base64Data,
+                    mimeType: 'audio/pcm;rate=24000',
+                });
+                
+                chunkCount++;
+                
+                // Log progress every 100 chunks (~10 seconds)
+                if (chunkCount === 1) {
+                    logToMain('info', 'First audio chunk sent to AI');
+                    cheatingDaddy.setStatus('Listening...');
+                } else if (chunkCount % 100 === 0) {
+                    // Calculate max amplitude to check if we're getting real audio
+                    const maxAmp = Math.max(...chunk.map(Math.abs));
+                    logToMain('info', `Audio progress: ${chunkCount} chunks, maxAmplitude: ${maxAmp.toFixed(4)}`);
+                }
+            }
+        };
+
+        source.connect(audioProcessor);
+        audioProcessor.connect(audioContext.destination);
+        
+        logToMain('info', 'Windows audio processing pipeline connected');
+        
+    } catch (err) {
+        logToMain('error', 'Error setting up Windows audio:', err.message, err.stack);
+        cheatingDaddy.setStatus('Audio error: ' + err.message);
+    }
 }
 
 async function captureScreenshot(imageQuality = 'medium', isManual = false) {

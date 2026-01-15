@@ -39,6 +39,14 @@ app.whenReady().then(async () => {
     
     // Add handler to get log path from renderer
     ipcMain.handle('get-log-path', () => getLogPath());
+    
+    // Add handler for renderer logs (so they go to the log file)
+    ipcMain.on('renderer-log', (event, { level, message }) => {
+        const prefix = '[RENDERER]';
+        if (level === 'error') console.error(prefix, message);
+        else if (level === 'warn') console.warn(prefix, message);
+        else console.log(prefix, message);
+    });
 });
 
 app.on('window-all-closed', () => {
