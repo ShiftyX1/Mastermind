@@ -30,15 +30,15 @@ module.exports = {
         ],
         // use `security find-identity -v -p codesigning` to find your identity
         // for macos signing
-        // Use ad-hoc signing with entitlements for local development
-        osxSign: {
-            identity: '-', // ad-hoc signing (no Apple Developer account needed)
-            optionsForFile: (filePath) => {
-                return {
-                    entitlements: 'entitlements.plist',
-                };
-            },
-        },
+        // Disabled for local builds - ad-hoc signing causes issues
+        // osxSign: {
+        //     identity: '-', // ad-hoc signing (no Apple Developer account needed)
+        //     optionsForFile: (filePath) => {
+        //         return {
+        //             entitlements: 'entitlements.plist',
+        //         };
+        //     },
+        // },
         // notarize is off - requires Apple Developer account
         // osxNotarize: {
         //    appleId: 'your apple id',
@@ -61,6 +61,10 @@ module.exports = {
         {
             name: '@electron-forge/maker-dmg',
             platforms: ['darwin'],
+            config: {
+                name: 'CheatingDaddy',
+                format: 'ULFO',
+            },
         },
         {
             name: '@reforged/maker-appimage',
