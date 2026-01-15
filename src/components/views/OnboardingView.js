@@ -157,6 +157,49 @@ export class OnboardingView extends LitElement {
             opacity: 0.8;
         }
 
+        .migration-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .migration-button {
+            flex: 1;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .migration-button.primary {
+            background: rgba(59, 130, 246, 0.8);
+            color: #ffffff;
+            border-color: rgba(59, 130, 246, 0.9);
+        }
+
+        .migration-button.primary:hover {
+            background: rgba(59, 130, 246, 0.9);
+            border-color: rgba(59, 130, 246, 1);
+        }
+
+        .migration-button.secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e5e5e5;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .migration-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .migration-button:active {
+            transform: scale(0.98);
+        }
+
         .navigation {
             position: absolute;
             bottom: 0;
@@ -239,6 +282,7 @@ export class OnboardingView extends LitElement {
     static properties = {
         currentSlide: { type: Number },
         contextText: { type: String },
+        hasOldConfig: { type: Boolean },
         onComplete: { type: Function },
         onClose: { type: Function },
     };
@@ -247,6 +291,7 @@ export class OnboardingView extends LitElement {
         super();
         this.currentSlide = 0;
         this.contextText = '';
+        this.hasOldConfig = false;
         this.onComplete = () => {};
         this.onClose = () => {};
         this.canvas = null;
@@ -297,7 +342,16 @@ export class OnboardingView extends LitElement {
                 [30, 40, 35], // Muted green
                 [5, 15, 10], // Almost black
             ],
-            // Slide 5 - Complete (Dark warm gray)
+            // Slide 5 - Migration (Dark teal-gray)
+            [
+                [20, 30, 30], // Dark teal-gray
+                [15, 25, 25], // Darker teal-gray
+                [25, 35, 35], // Slightly teal
+                [10, 20, 20], // Very dark teal
+                [30, 40, 40], // Muted teal
+                [5, 15, 15], // Almost black
+            ],
+            // Slide 6 - Complete (Dark warm gray)
             [
                 [30, 25, 20], // Dark warm gray
                 [25, 20, 15], // Darker warm
@@ -309,13 +363,25 @@ export class OnboardingView extends LitElement {
         ];
     }
 
-    firstUpdated() {
+    async firstUpdated() {
         this.canvas = this.shadowRoot.querySelector('.gradient-canvas');
         this.ctx = this.canvas.getContext('2d');
         this.resizeCanvas();
         this.startGradientAnimation();
 
         window.addEventListener('resize', () => this.resizeCanvas());
+
+        // Check if old config exists
+        if (window.mastermind && window.mastermind.storage) {
+            try {
+                this.hasOldConfig = await window.mastermind.storage.hasOldConfig();
+                console.log('Has old config:', this.hasOldConfig);
+                this.requestUpdate(); // Force re-render with new hasOldConfig value
+            } catch (error) {
+                console.error('Error checking old config:', error);
+                this.hasOldConfig = false;
+            }
+        }
     }
 
     disconnectedCallback() {
@@ -414,7 +480,7 @@ export class OnboardingView extends LitElement {
     }
 
     nextSlide() {
-        if (this.currentSlide < 4) {
+        if (this.currentSlide < 5) {
             this.startColorTransition(this.currentSlide + 1);
         } else {
             this.completeOnboarding();
@@ -462,11 +528,23 @@ export class OnboardingView extends LitElement {
         }
     }
 
+    async handleMigrate() {
+        const success = await window.mastermind.storage.migrateFromOldConfig();
+        if (success) {
+            console.log('Migration completed successfully');
+        }
+        this.nextSlide();
+    }
+
+    async handleSkipMigration() {
+        this.nextSlide();
+    }
+
     async completeOnboarding() {
         if (this.contextText.trim()) {
-            await cheatingDaddy.storage.updatePreference('customPrompt', this.contextText.trim());
+            await mastermind.storage.updatePreference('customPrompt', this.contextText.trim());
         }
-        await cheatingDaddy.storage.updateConfig('onboarded', true);
+        await mastermind.storage.updateConfig('onboarded', true);
         this.onComplete();
     }
 
@@ -474,9 +552,9 @@ export class OnboardingView extends LitElement {
         const slides = [
             {
                 icon: 'assets/onboarding/welcome.svg',
-                title: 'Welcome to Cheating Daddy',
+                title: 'Welcome to Mastermind',
                 content:
-                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews and meetings.',
+                    'Your AI assistant that listens and watches, then provides intelligent suggestions automatically during interviews, meetings, and presentations.',
             },
             {
                 icon: 'assets/onboarding/security.svg',
@@ -496,9 +574,17 @@ export class OnboardingView extends LitElement {
                 showFeatures: true,
             },
             {
+                icon: 'assets/onboarding/context.svg',
+                title: 'Migrate Settings?',
+                content: this.hasOldConfig
+                    ? 'Mastermind is a fork of Cheating Daddy. We detected existing Cheating Daddy settings on your system. Would you like to automatically migrate your settings, API keys, and history?'
+                    : 'Mastermind is a fork of Cheating Daddy. No previous settings were detected.',
+                showMigration: this.hasOldConfig,
+            },
+            {
                 icon: 'assets/onboarding/ready.svg',
                 title: 'Ready to Go',
-                content: 'Add your Gemini API key in settings and start getting AI-powered assistance in real-time.',
+                content: 'Choose your AI Provider and start getting AI-powered assistance in real-time.',
             },
         ];
 
@@ -552,6 +638,18 @@ export class OnboardingView extends LitElement {
                               </div>
                           `
                         : ''}
+                    ${slide.showMigration
+                        ? html`
+                              <div class="migration-buttons">
+                                  <button class="migration-button primary" @click=${this.handleMigrate}>
+                                      Migrate Settings
+                                  </button>
+                                  <button class="migration-button secondary" @click=${this.handleSkipMigration}>
+                                      Start Fresh
+                                  </button>
+                              </div>
+                          `
+                        : ''}
                 </div>
 
                 <div class="navigation">
@@ -562,7 +660,7 @@ export class OnboardingView extends LitElement {
                     </button>
 
                     <div class="progress-dots">
-                        ${[0, 1, 2, 3, 4].map(
+                        ${[0, 1, 2, 3, 4, 5].map(
                             index => html`
                                 <div
                                     class="dot ${index === this.currentSlide ? 'active' : ''}"
@@ -577,7 +675,7 @@ export class OnboardingView extends LitElement {
                     </div>
 
                     <button class="nav-button" @click=${this.nextSlide}>
-                        ${this.currentSlide === 4
+                        ${this.currentSlide === 5
                             ? 'Get Started'
                             : html`
                                   <svg width="16px" height="16px" stroke-width="2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

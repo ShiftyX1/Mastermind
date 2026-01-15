@@ -137,6 +137,17 @@ const storage = {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
     },
+
+    // Migration
+    hasOldConfig() {
+        // Note: This is synchronous in the main process, but we need to use invoke which is async
+        // So we'll make this return a promise
+        return ipcRenderer.invoke('storage:has-old-config').then(result => (result.success ? result.data : false));
+    },
+    async migrateFromOldConfig() {
+        const result = await ipcRenderer.invoke('storage:migrate-from-old-config');
+        return result.success ? result.data : false;
+    },
 };
 
 // Cache for preferences to avoid async calls in hot paths
@@ -174,16 +185,16 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     const prefs = await storage.getPreferences();
     const success = await ipcRenderer.invoke('initialize-ai-session', prefs.customPrompt || '', profile, language);
     if (success) {
-        cheatingDaddy.setStatus('Live');
+        mastermind.setStatus('Live');
     } else {
-        cheatingDaddy.setStatus('Error: Failed to initialize AI session Gemini');
+        mastermind.setStatus('Error: Failed to initialize AI session Gemini');
     }
 }
 
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    cheatingDaddy.setStatus(status);
+    mastermind.setStatus(status);
 });
 
 ipcRenderer.on('push-to-talk-toggle', () => {
@@ -306,18 +317,18 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         } else {
             // Windows - show custom screen picker first
             logToMain('info', '=== Starting Windows audio capture ===');
-            cheatingDaddy.setStatus('Choose screen to share...');
+            mastermind.setStatus('Choose screen to share...');
 
             // Show screen picker dialog
-            const appElement = document.querySelector('cheating-daddy-app');
+            const appElement = document.querySelector('mastermind-app');
             const pickerResult = await appElement.showScreenPickerDialog();
 
             if (pickerResult.cancelled) {
-                cheatingDaddy.setStatus('Cancelled');
+                mastermind.setStatus('Cancelled');
                 return;
             }
 
-            cheatingDaddy.setStatus('Starting capture...');
+            mastermind.setStatus('Starting capture...');
 
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
@@ -351,7 +362,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             if (audioTracks.length === 0) {
                 logToMain('warn', 'WARNING: No audio tracks! User must check "Share audio" in screen picker dialog');
-                cheatingDaddy.setStatus('Warning: No audio - enable "Share audio" checkbox');
+                mastermind.setStatus('Warning: No audio - enable "Share audio" checkbox');
             } else {
                 logToMain('info', 'Audio track acquired, setting up processing...');
                 // Setup audio processing for Windows loopback audio only
@@ -403,7 +414,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
             errorMessage = 'Screen selection was cancelled. Please try again.';
         }
 
-        cheatingDaddy.setStatus('Error: ' + errorMessage);
+        mastermind.setStatus('Error: ' + errorMessage);
     }
 }
 
@@ -524,7 +535,7 @@ function setupWindowsLoopbackProcessing() {
                 // Log progress every 100 chunks (~10 seconds)
                 if (chunkCount === 1) {
                     logToMain('info', 'First audio chunk sent to AI');
-                    cheatingDaddy.setStatus('Listening...');
+                    mastermind.setStatus('Listening...');
                 } else if (chunkCount % 100 === 0) {
                     // Calculate max amplitude to check if we're getting real audio
                     const maxAmp = Math.max(...chunk.map(Math.abs));
@@ -539,7 +550,7 @@ function setupWindowsLoopbackProcessing() {
         logToMain('info', 'Windows audio processing pipeline connected');
     } catch (err) {
         logToMain('error', 'Error setting up Windows audio:', err.message, err.stack);
-        cheatingDaddy.setStatus('Audio error: ' + err.message);
+        mastermind.setStatus('Audio error: ' + err.message);
     }
 }
 
@@ -694,7 +705,7 @@ async function startRegionSelection() {
 
     if (!mediaStream) {
         console.error('No media stream available. Please start capture first.');
-        cheatingDaddy?.addNewResponse('Please start screen capture first before selecting a region.');
+        mastermind?.addNewResponse('Please start screen capture first before selecting a region.');
         return;
     }
 
@@ -800,7 +811,7 @@ async function captureRegionFromScreenshot(rect, screenshotDataUrl) {
                     console.log(`Region capture response completed from ${result.model}`);
                 } else {
                     console.error('Failed to get region capture response:', result.error);
-                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                    mastermind.addNewResponse(`Error: ${result.error}`);
                 }
             };
             reader.readAsDataURL(blob);
@@ -892,7 +903,7 @@ async function captureManualScreenshot(imageQuality = null) {
                     // Response already displayed via streaming events (new-response/update-response)
                 } else {
                     console.error('Failed to get image response:', result.error);
-                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+                    mastermind.addNewResponse(`Error: ${result.error}`);
                 }
             };
             reader.readAsDataURL(blob);
@@ -1015,11 +1026,11 @@ ipcRenderer.on('clear-sensitive-data', async () => {
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = cheatingDaddy.getCurrentView();
+    const currentView = mastermind.getCurrentView();
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            cheatingDaddy.element().handleStart();
+            mastermind.element().handleStart();
         } else {
             captureManualScreenshot();
         }
@@ -1027,7 +1038,7 @@ function handleShortcut(shortcutKey) {
 }
 
 // Create reference to the main app element
-const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
+const mastermindApp = document.querySelector('mastermind-app');
 
 // ============ THEME SYSTEM ============
 const theme = {
@@ -1261,23 +1272,23 @@ const theme = {
     },
 };
 
-// Consolidated cheatingDaddy object - all functions in one place
-const cheatingDaddy = {
+// Consolidated mastermind object - all functions in one place
+const mastermind = {
     // App version
     getVersion: async () => ipcRenderer.invoke('get-app-version'),
 
     // Element access
-    element: () => cheatingDaddyApp,
-    e: () => cheatingDaddyApp,
+    element: () => mastermindApp,
+    e: () => mastermindApp,
 
     // App state functions - access properties directly from the app element
-    getCurrentView: () => cheatingDaddyApp.currentView,
-    getLayoutMode: () => cheatingDaddyApp.layoutMode,
+    getCurrentView: () => mastermindApp.currentView,
+    getLayoutMode: () => mastermindApp.layoutMode,
 
     // Status and response functions
-    setStatus: text => cheatingDaddyApp.setStatus(text),
-    addNewResponse: response => cheatingDaddyApp.addNewResponse(response),
-    updateCurrentResponse: response => cheatingDaddyApp.updateCurrentResponse(response),
+    setStatus: text => mastermindApp.setStatus(text),
+    addNewResponse: response => mastermindApp.addNewResponse(response),
+    updateCurrentResponse: response => mastermindApp.updateCurrentResponse(response),
 
     // Core functionality
     initializeGemini,
@@ -1301,7 +1312,7 @@ const cheatingDaddy = {
 };
 
 // Make it globally available
-window.cheatingDaddy = cheatingDaddy;
+window.mastermind = mastermind;
 
 // Load theme after DOM is ready
 if (document.readyState === 'loading') {

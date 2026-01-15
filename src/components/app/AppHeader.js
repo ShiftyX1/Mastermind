@@ -314,8 +314,8 @@ export class AppHeader extends LitElement {
 
     async _checkForUpdates() {
         try {
-            const currentVersion = await cheatingDaddy.getVersion();
-            const response = await fetch('https://raw.githubusercontent.com/sohzm/cheating-daddy/refs/heads/master/package.json');
+            const currentVersion = await mastermind.getVersion();
+            const response = await fetch('https://raw.githubusercontent.com/ShiftyX1/Mastermind/refs/heads/master/package.json');
             if (!response.ok) return;
 
             const remotePackage = await response.json();
@@ -344,7 +344,7 @@ export class AppHeader extends LitElement {
 
     async _openUpdatePage() {
         const { ipcRenderer } = require('electron');
-        await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com');
+        await ipcRenderer.invoke('open-external', 'https://github.com/ShiftyX1/Mastermind');
     }
 
     disconnectedCallback() {
@@ -396,15 +396,15 @@ export class AppHeader extends LitElement {
 
     getViewTitle() {
         const titles = {
-            onboarding: 'Welcome to Cheating Daddy',
-            main: 'Cheating Daddy',
+            onboarding: 'Welcome to Mastermind',
+            main: 'Mastermind',
             customize: 'Customize',
             help: 'Help & Shortcuts',
             history: 'Conversation History',
             advanced: 'Advanced Tools',
-            assistant: 'Cheating Daddy',
+            assistant: 'Mastermind',
         };
-        return titles[this.currentView] || 'Cheating Daddy';
+        return titles[this.currentView] || 'Mastermind';
     }
 
     getElapsedTime() {
@@ -539,7 +539,7 @@ export class AppHeader extends LitElement {
                     ${this.currentView === 'assistant'
                         ? html`
                               <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${mastermind.isMacOS ? 'Cmd' : 'Ctrl'}</span
                                   >&nbsp;&nbsp;<span class="key">&bsol;</span>
                               </button>
                               <button @click=${this.onCloseClick} class="icon-button window-close">

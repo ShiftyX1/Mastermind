@@ -150,7 +150,7 @@ export class MainView extends LitElement {
     }
 
     async _loadApiKey() {
-        this.apiKey = await cheatingDaddy.storage.getApiKey();
+        this.apiKey = await mastermind.storage.getApiKey();
         this.requestUpdate();
     }
 
@@ -186,7 +186,7 @@ export class MainView extends LitElement {
 
     async handleInput(e) {
         this.apiKey = e.target.value;
-        await cheatingDaddy.storage.setApiKey(e.target.value);
+        await mastermind.storage.setApiKey(e.target.value);
         // Clear error state when user starts typing
         if (this.showApiKeyError) {
             this.showApiKeyError = false;
@@ -226,7 +226,7 @@ export class MainView extends LitElement {
             <div class="input-group">
                 <input
                     type="password"
-                    placeholder="Enter your Gemini API Key"
+                    placeholder="Enter your AI Provider API Key"
                     .value=${this.apiKey}
                     @input=${this.handleInput}
                     class="${this.showApiKeyError ? 'api-key-error' : ''}"
@@ -235,10 +235,10 @@ export class MainView extends LitElement {
                     ${this.getStartButtonText()}
                 </button>
             </div>
-            <p class="description">
+            <!-- <p class="description">
                 dont have an api key?
                 <span @click=${this.handleAPIKeyHelpClick} class="link">get one here</span>
-            </p>
+            </p> -->
         `;
     }
 }

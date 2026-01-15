@@ -7,7 +7,7 @@ module.exports = {
     packagerConfig: {
         asar: true,
         extraResource: ['./src/assets/SystemAudioDump'],
-        name: 'Cheating Daddy',
+        name: 'Mastermind',
         icon: 'src/assets/logo',
         // Fix executable permissions after packaging
         afterCopy: [
@@ -51,9 +51,9 @@ module.exports = {
         {
             name: '@electron-forge/maker-squirrel',
             config: {
-                name: 'cheating-daddy',
-                productName: 'Cheating Daddy',
-                shortcutName: 'Cheating Daddy',
+                name: 'mastermind',
+                productName: 'Mastermind',
+                shortcutName: 'Mastermind',
                 createDesktopShortcut: true,
                 createStartMenuShortcut: true,
             },
@@ -62,7 +62,7 @@ module.exports = {
             name: '@electron-forge/maker-dmg',
             platforms: ['darwin'],
             config: {
-                name: 'CheatingDaddy',
+                name: 'Mastermind',
                 format: 'ULFO',
             },
         },
@@ -71,10 +71,10 @@ module.exports = {
             platforms: ['linux'],
             config: {
                 options: {
-                    name: 'Cheating Daddy',
-                    productName: 'Cheating Daddy',
+                    name: 'Mastermind',
+                    productName: 'Mastermind',
                     genericName: 'AI Assistant',
-                    description: 'AI assistant for interviews and learning',
+                    description: 'AI assistant for video calls, interviews, presentations, and meetings',
                     categories: ['Development', 'Education'],
                     icon: 'src/assets/logo.png',
                 },

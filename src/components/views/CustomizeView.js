@@ -617,7 +617,7 @@ export class CustomizeView extends LitElement {
     }
 
     getThemes() {
-        return cheatingDaddy.theme.getAll();
+        return mastermind.theme.getAll();
     }
 
     setActiveSection(section) {
@@ -787,11 +787,11 @@ export class CustomizeView extends LitElement {
     async _loadFromStorage() {
         try {
             const [prefs, keybinds, credentials, openaiCreds, openaiSdkCreds] = await Promise.all([
-                cheatingDaddy.storage.getPreferences(),
-                cheatingDaddy.storage.getKeybinds(),
-                cheatingDaddy.storage.getCredentials(),
-                cheatingDaddy.storage.getOpenAICredentials(),
-                cheatingDaddy.storage.getOpenAISDKCredentials(),
+                mastermind.storage.getPreferences(),
+                mastermind.storage.getKeybinds(),
+                mastermind.storage.getCredentials(),
+                mastermind.storage.getOpenAICredentials(),
+                mastermind.storage.getOpenAISDKCredentials(),
             ]);
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
@@ -944,18 +944,18 @@ export class CustomizeView extends LitElement {
 
     async handleCustomPromptInput(e) {
         this.customPrompt = e.target.value;
-        await cheatingDaddy.storage.updatePreference('customPrompt', e.target.value);
+        await mastermind.storage.updatePreference('customPrompt', e.target.value);
     }
 
     async handleAudioModeSelect(e) {
         this.audioMode = e.target.value;
-        await cheatingDaddy.storage.updatePreference('audioMode', e.target.value);
+        await mastermind.storage.updatePreference('audioMode', e.target.value);
         this.requestUpdate();
     }
 
     async handleAudioInputModeChange(e) {
         this.audioInputMode = e.target.value;
-        await cheatingDaddy.storage.updatePreference('audioInputMode', e.target.value);
+        await mastermind.storage.updatePreference('audioInputMode', e.target.value);
         this.notifyPushToTalkSettings();
         this.requestUpdate();
     }
@@ -977,13 +977,13 @@ export class CustomizeView extends LitElement {
 
     async handleThemeChange(e) {
         this.theme = e.target.value;
-        await cheatingDaddy.theme.save(this.theme);
+        await mastermind.theme.save(this.theme);
         this.updateBackgroundAppearance();
         this.requestUpdate();
     }
 
     getDefaultKeybinds() {
-        const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
+        const isMac = mastermind.isMacOS || navigator.platform.includes('Mac');
         return {
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
@@ -1001,7 +1001,7 @@ export class CustomizeView extends LitElement {
     }
 
     async saveKeybinds() {
-        await cheatingDaddy.storage.setKeybinds(this.keybinds);
+        await mastermind.storage.setKeybinds(this.keybinds);
         // Send to main process to update global shortcuts
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -1017,7 +1017,7 @@ export class CustomizeView extends LitElement {
 
     async resetKeybinds() {
         this.keybinds = this.getDefaultKeybinds();
-        await cheatingDaddy.storage.setKeybinds(null);
+        await mastermind.storage.setKeybinds(null);
         this.requestUpdate();
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
@@ -1167,7 +1167,7 @@ export class CustomizeView extends LitElement {
 
     async handleGoogleSearchChange(e) {
         this.googleSearchEnabled = e.target.checked;
-        await cheatingDaddy.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
+        await mastermind.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
 
         // Notify main process if available
         if (window.require) {
@@ -1184,32 +1184,32 @@ export class CustomizeView extends LitElement {
 
     async handleAIProviderChange(e) {
         this.aiProvider = e.target.value;
-        await cheatingDaddy.storage.updatePreference('aiProvider', e.target.value);
+        await mastermind.storage.updatePreference('aiProvider', e.target.value);
         this.requestUpdate();
     }
 
     async handleGeminiApiKeyInput(e) {
         this.geminiApiKey = e.target.value;
-        await cheatingDaddy.storage.setApiKey(e.target.value);
+        await mastermind.storage.setApiKey(e.target.value);
     }
 
     async handleOpenAIApiKeyInput(e) {
         this.openaiApiKey = e.target.value;
-        await cheatingDaddy.storage.setOpenAICredentials({
+        await mastermind.storage.setOpenAICredentials({
             apiKey: e.target.value,
         });
     }
 
     async handleOpenAIBaseUrlInput(e) {
         this.openaiBaseUrl = e.target.value;
-        await cheatingDaddy.storage.setOpenAICredentials({
+        await mastermind.storage.setOpenAICredentials({
             baseUrl: e.target.value,
         });
     }
 
     async handleOpenAIModelInput(e) {
         this.openaiModel = e.target.value;
-        await cheatingDaddy.storage.setOpenAICredentials({
+        await mastermind.storage.setOpenAICredentials({
             model: e.target.value,
         });
     }
@@ -1217,35 +1217,35 @@ export class CustomizeView extends LitElement {
     // OpenAI SDK handlers
     async handleOpenAISdkApiKeyInput(e) {
         this.openaiSdkApiKey = e.target.value;
-        await cheatingDaddy.storage.setOpenAISDKCredentials({
+        await mastermind.storage.setOpenAISDKCredentials({
             apiKey: e.target.value,
         });
     }
 
     async handleOpenAISdkBaseUrlInput(e) {
         this.openaiSdkBaseUrl = e.target.value;
-        await cheatingDaddy.storage.setOpenAISDKCredentials({
+        await mastermind.storage.setOpenAISDKCredentials({
             baseUrl: e.target.value,
         });
     }
 
     async handleOpenAISdkModelInput(e) {
         this.openaiSdkModel = e.target.value;
-        await cheatingDaddy.storage.setOpenAISDKCredentials({
+        await mastermind.storage.setOpenAISDKCredentials({
             model: e.target.value,
         });
     }
 
     async handleOpenAISdkVisionModelInput(e) {
         this.openaiSdkVisionModel = e.target.value;
-        await cheatingDaddy.storage.setOpenAISDKCredentials({
+        await mastermind.storage.setOpenAISDKCredentials({
             visionModel: e.target.value,
         });
     }
 
     async handleOpenAISdkWhisperModelInput(e) {
         this.openaiSdkWhisperModel = e.target.value;
-        await cheatingDaddy.storage.setOpenAISDKCredentials({
+        await mastermind.storage.setOpenAISDKCredentials({
             whisperModel: e.target.value,
         });
     }
@@ -1259,7 +1259,7 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
 
         try {
-            await cheatingDaddy.storage.clearAll();
+            await mastermind.storage.clearAll();
 
             this.clearStatusMessage = 'Successfully cleared all local data';
             this.clearStatusType = 'success';
@@ -1288,15 +1288,15 @@ export class CustomizeView extends LitElement {
 
     async handleBackgroundTransparencyChange(e) {
         this.backgroundTransparency = parseFloat(e.target.value);
-        await cheatingDaddy.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
+        await mastermind.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
         this.updateBackgroundAppearance();
         this.requestUpdate();
     }
 
     updateBackgroundAppearance() {
         // Use theme's background color
-        const colors = cheatingDaddy.theme.get(this.theme);
-        cheatingDaddy.theme.applyBackgrounds(colors.background, this.backgroundTransparency);
+        const colors = mastermind.theme.get(this.theme);
+        mastermind.theme.applyBackgrounds(colors.background, this.backgroundTransparency);
     }
 
     // Keep old function name for backwards compatibility
@@ -1306,7 +1306,7 @@ export class CustomizeView extends LitElement {
 
     async handleFontSizeChange(e) {
         this.fontSize = parseInt(e.target.value, 10);
-        await cheatingDaddy.storage.updatePreference('fontSize', this.fontSize);
+        await mastermind.storage.updatePreference('fontSize', this.fontSize);
         this.updateFontSize();
         this.requestUpdate();
     }

@@ -52,6 +52,22 @@ function getConfigDir() {
     let configDir;
 
     if (platform === 'win32') {
+        configDir = path.join(os.homedir(), 'AppData', 'Roaming', 'mastermind-config');
+    } else if (platform === 'darwin') {
+        configDir = path.join(os.homedir(), 'Library', 'Application Support', 'mastermind-config');
+    } else {
+        configDir = path.join(os.homedir(), '.config', 'mastermind-config');
+    }
+
+    return configDir;
+}
+
+// Get the old config directory path for migration
+function getOldConfigDir() {
+    const platform = os.platform();
+    let configDir;
+
+    if (platform === 'win32') {
         configDir = path.join(os.homedir(), 'AppData', 'Roaming', 'cheating-daddy-config');
     } else if (platform === 'darwin') {
         configDir = path.join(os.homedir(), 'Library', 'Application Support', 'cheating-daddy-config');
@@ -60,6 +76,43 @@ function getConfigDir() {
     }
 
     return configDir;
+}
+
+// Check if old config directory exists
+function hasOldConfig() {
+    const oldDir = getOldConfigDir();
+    return fs.existsSync(oldDir);
+}
+
+// Migrate config from old directory to new directory if needed
+function migrateFromOldConfig() {
+    const oldDir = getOldConfigDir();
+    const newDir = getConfigDir();
+
+    if (!fs.existsSync(oldDir)) {
+        console.log('No old config found to migrate');
+        return false;
+    }
+
+    if (fs.existsSync(newDir)) {
+        // NOTE: Does not matter if the new config directory already exists, we will overwrite it with the old config
+        fs.rmSync(newDir, { recursive: true, force: true });
+        console.log('New config directory already exists, overwriting with old config');
+    }
+
+    console.log(`Migrating config from ${oldDir} to ${newDir}...`);
+    try {
+        const parentDir = path.dirname(newDir);
+        if (!fs.existsSync(parentDir)) {
+            fs.mkdirSync(parentDir, { recursive: true });
+        }
+        fs.renameSync(oldDir, newDir);
+        console.log('Migration successful');
+        return true;
+    } catch (error) {
+        console.error('Migration failed:', error.message);
+        return false;
+    }
 }
 
 // File paths
@@ -468,6 +521,10 @@ module.exports = {
     // Initialization
     initializeStorage,
     getConfigDir,
+
+    // Migration
+    hasOldConfig,
+    migrateFromOldConfig,
 
     // Config
     getConfig,

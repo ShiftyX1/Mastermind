@@ -243,7 +243,7 @@ export class HelpView extends LitElement {
 
     async _loadKeybinds() {
         try {
-            const keybinds = await cheatingDaddy.storage.getKeybinds();
+            const keybinds = await mastermind.storage.getKeybinds();
             if (keybinds) {
                 this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
                 this.requestUpdate();
@@ -260,7 +260,7 @@ export class HelpView extends LitElement {
     }
 
     getDefaultKeybinds() {
-        const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
+        const isMac = mastermind.isMacOS || navigator.platform.includes('Mac');
         return {
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
@@ -285,8 +285,8 @@ export class HelpView extends LitElement {
     }
 
     render() {
-        const isMacOS = cheatingDaddy.isMacOS || false;
-        const isLinux = cheatingDaddy.isLinux || false;
+        const isMacOS = mastermind.isMacOS || false;
+        const isLinux = mastermind.isLinux || false;
 
         return html`
             <div class="help-container">
@@ -295,7 +295,7 @@ export class HelpView extends LitElement {
                         <span>Community & Support</span>
                     </div>
                     <div class="community-links">
-                        <!-- <div class="community-link" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com')}>
+                        <!-- <div class="community-link" @click=${() => this.handleExternalLinkClick('https://github.com/ShiftyX1/Mastermind')}>
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -442,7 +442,7 @@ export class HelpView extends LitElement {
                         <span>How to Use</span>
                     </div>
                     <div class="usage-steps">
-                        <div class="usage-step"><strong>Start a Session:</strong> Enter your Gemini API key and click "Start Session"</div>
+                        <div class="usage-step"><strong>Start a Session:</strong> Enter your AI Provider API key and click "Start Session"</div>
                         <div class="usage-step"><strong>Customize:</strong> Choose your profile and language in the settings</div>
                         <div class="usage-step">
                             <strong>Position Window:</strong> Use keyboard shortcuts to move the window to your desired location

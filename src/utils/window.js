@@ -259,7 +259,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
                     // Use the new handleShortcut function
                     mainWindow.webContents.executeJavaScript(`
-                        cheatingDaddy.handleShortcut('${shortcutKey}');
+                        mastermind.handleShortcut('${shortcutKey}');
                     `);
                 } catch (error) {
                     console.error('Error handling next step shortcut:', error);
@@ -492,8 +492,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             // Get current view and layout mode from renderer
             let viewName, layoutMode;
             try {
-                viewName = await event.sender.executeJavaScript('cheatingDaddy.getCurrentView()');
-                layoutMode = await event.sender.executeJavaScript('cheatingDaddy.getLayoutMode()');
+                viewName = await event.sender.executeJavaScript('mastermind.getCurrentView()');
+                layoutMode = await event.sender.executeJavaScript('mastermind.getLayoutMode()');
             } catch (error) {
                 console.warn('Failed to get view/layout from renderer, using defaults:', error);
                 viewName = 'main';

@@ -8,7 +8,7 @@ import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { ScreenPickerDialog } from '../views/ScreenPickerDialog.js';
 
-export class CheatingDaddyApp extends LitElement {
+export class MastermindApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
@@ -154,9 +154,9 @@ export class CheatingDaddyApp extends LitElement {
     async _loadFromStorage() {
         try {
             const [config, prefs, openaiSdkCreds] = await Promise.all([
-                cheatingDaddy.storage.getConfig(),
-                cheatingDaddy.storage.getPreferences(),
-                cheatingDaddy.storage.getOpenAISDKCredentials(),
+                mastermind.storage.getConfig(),
+                mastermind.storage.getPreferences(),
+                mastermind.storage.getOpenAISDKCredentials(),
             ]);
 
             // Check onboarding status
@@ -325,7 +325,7 @@ export class CheatingDaddyApp extends LitElement {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
         } else if (this.currentView === 'assistant') {
-            cheatingDaddy.stopCapture();
+            mastermind.stopCapture();
 
             // Close the session
             if (window.require) {
@@ -354,7 +354,7 @@ export class CheatingDaddyApp extends LitElement {
     // Main view event handlers
     async handleStart() {
         // check if api key is empty do nothing
-        const apiKey = await cheatingDaddy.storage.getApiKey();
+        const apiKey = await mastermind.storage.getApiKey();
         if (!apiKey || apiKey === '') {
             // Trigger the red blink animation on the API key input
             const mainView = this.shadowRoot.querySelector('main-view');
@@ -364,9 +364,9 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        await mastermind.initializeGemini(this.selectedProfile, this.selectedLanguage);
         // Pass the screenshot interval as string (including 'manual' option)
-        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        mastermind.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
@@ -383,22 +383,22 @@ export class CheatingDaddyApp extends LitElement {
     // Customize view event handlers
     async handleProfileChange(profile) {
         this.selectedProfile = profile;
-        await cheatingDaddy.storage.updatePreference('selectedProfile', profile);
+        await mastermind.storage.updatePreference('selectedProfile', profile);
     }
 
     async handleLanguageChange(language) {
         this.selectedLanguage = language;
-        await cheatingDaddy.storage.updatePreference('selectedLanguage', language);
+        await mastermind.storage.updatePreference('selectedLanguage', language);
     }
 
     async handleScreenshotIntervalChange(interval) {
         this.selectedScreenshotInterval = interval;
-        await cheatingDaddy.storage.updatePreference('selectedScreenshotInterval', interval);
+        await mastermind.storage.updatePreference('selectedScreenshotInterval', interval);
     }
 
     async handleImageQualityChange(quality) {
         this.selectedImageQuality = quality;
-        await cheatingDaddy.storage.updatePreference('selectedImageQuality', quality);
+        await mastermind.storage.updatePreference('selectedImageQuality', quality);
     }
 
     handleBackClick() {
@@ -416,7 +416,7 @@ export class CheatingDaddyApp extends LitElement {
 
     // Assistant view event handlers
     async handleSendText(message) {
-        const result = await window.cheatingDaddy.sendTextMessage(message);
+        const result = await window.mastermind.sendTextMessage(message);
 
         if (!result.success) {
             console.error('Failed to send message:', result.error);
@@ -582,7 +582,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleLayoutModeChange(layoutMode) {
         this.layoutMode = layoutMode;
-        await cheatingDaddy.storage.updateConfig('layout', layoutMode);
+        await mastermind.storage.updateConfig('layout', layoutMode);
         this.updateLayoutMode();
 
         // Notify main process about layout change for window resizing
@@ -637,4 +637,4 @@ export class CheatingDaddyApp extends LitElement {
     }
 }
 
-customElements.define('cheating-daddy-app', CheatingDaddyApp);
+customElements.define('mastermind-app', MastermindApp);

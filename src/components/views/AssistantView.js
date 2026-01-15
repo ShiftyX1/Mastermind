@@ -645,18 +645,18 @@ export class AssistantView extends LitElement {
     }
 
     async loadLimits() {
-        if (window.cheatingDaddy?.storage?.getTodayLimits) {
-            const limits = await window.cheatingDaddy.storage.getTodayLimits();
+        if (window.mastermind?.storage?.getTodayLimits) {
+            const limits = await window.mastermind.storage.getTodayLimits();
             this.flashCount = limits.flash?.count || 0;
             this.flashLiteCount = limits.flashLite?.count || 0;
         }
     }
 
     async loadPushToTalkKeybind() {
-        if (window.cheatingDaddy?.storage?.getKeybinds) {
-            const isMac = window.cheatingDaddy?.isMacOS || navigator.platform.includes('Mac');
+        if (window.mastermind?.storage?.getKeybinds) {
+            const isMac = window.mastermind?.isMacOS || navigator.platform.includes('Mac');
             const defaultKeybind = isMac ? 'Ctrl+Space' : 'Ctrl+Space';
-            const keybinds = await window.cheatingDaddy.storage.getKeybinds();
+            const keybinds = await window.mastermind.storage.getKeybinds();
             this.pushToTalkKeybind = keybinds?.pushToTalk || defaultKeybind;
         }
     }

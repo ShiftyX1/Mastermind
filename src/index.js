@@ -295,6 +295,26 @@ function setupStorageIpcHandlers() {
             return { success: false, error: error.message };
         }
     });
+
+    // ============ MIGRATION ============
+    ipcMain.handle('storage:has-old-config', async () => {
+        try {
+            return { success: true, data: storage.hasOldConfig() };
+        } catch (error) {
+            console.error('Error checking old config:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:migrate-from-old-config', async () => {
+        try {
+            const success = storage.migrateFromOldConfig();
+            return { success: true, data: success };
+        } catch (error) {
+            console.error('Error migrating from old config:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
 
 function setupGeneralIpcHandlers() {
