@@ -201,6 +201,80 @@ ipcRenderer.on('push-to-talk-toggle', () => {
     ipcRenderer.send('push-to-talk-toggle');
 });
 
+/**
+ * Checks screen capture permission status on macOS
+ * @returns {Promise<boolean>} true if permission is granted
+ */
+async function checkMacOSScreenCapturePermission() {
+    if (!isMacOS) {
+        console.log('[Permission Check] Not macOS, skipping');
+        return true;
+    }
+
+    try {
+        console.log('[Permission Check] Checking screen capture permission on macOS...');
+        const result = await ipcRenderer.invoke('check-screen-capture-permission');
+        console.log('[Permission Check] Result:', result);
+        if (!result.granted) {
+            console.warn('[Permission Check] Screen capture permission not granted:', result.status);
+            logToMain('warn', 'Screen capture permission check:', result);
+        } else {
+            console.log('[Permission Check] Screen capture permission granted');
+        }
+        return result.granted;
+    } catch (error) {
+        console.error('[Permission Check] Error checking permission:', error);
+        logToMain('error', 'Permission check error:', error);
+        return false;
+    }
+}
+
+/**
+ * Wrapper for getDisplayMedia with timeout and retries
+ * @param {object} constraints - Media constraints
+ * @param {number} timeout - Timeout in milliseconds (default 30 seconds)
+ * @param {number} retries - Number of retry attempts (default 1)
+ * @returns {Promise<MediaStream>}
+ */
+async function getDisplayMediaWithTimeout(constraints, timeout = 30000, retries = 1) {
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+        try {
+            console.log(`[Attempt ${attempt}/${retries + 1}] Requesting display media...`);
+            console.log('[getDisplayMedia] Constraints:', JSON.stringify(constraints));
+
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Display media request timed out')), timeout);
+            });
+
+            const mediaPromise = navigator.mediaDevices.getDisplayMedia(constraints);
+
+            const stream = await Promise.race([mediaPromise, timeoutPromise]);
+
+            console.log('Display media obtained successfully');
+            console.log(
+                'Stream tracks:',
+                stream.getTracks().map(t => ({ kind: t.kind, label: t.label, enabled: t.enabled }))
+            );
+            return stream;
+        } catch (error) {
+            console.error(`[Attempt ${attempt}/${retries + 1}] Error type:`, error.constructor.name);
+            console.error(`[Attempt ${attempt}/${retries + 1}] Error message:`, error.message);
+            console.error(`[Attempt ${attempt}/${retries + 1}] Error name:`, error.name);
+            console.error(`[Attempt ${attempt}/${retries + 1}] Full error:`, error);
+            console.error(`[Attempt ${attempt}/${retries + 1}] Error stack:`, error.stack);
+
+            if (attempt <= retries) {
+                console.log(`Retrying in 2 seconds...`);
+                const errorMsg = error.message || error.name || 'Unknown error';
+                mastermind?.setStatus(`Error: ${errorMsg}. Retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
     // Store the image quality for manual screenshots
     currentImageQuality = imageQuality;
@@ -210,9 +284,30 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     const audioMode = preferencesCache.audioMode || 'speaker_only';
 
     try {
+        // Pre-flight check for macOS
         if (isMacOS) {
-            // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
+            mastermind.setStatus('Checking permissions...');
+            const hasPermission = await checkMacOSScreenCapturePermission();
+            if (!hasPermission) {
+                throw new Error('Screen recording permission not granted. Please enable in System Settings.');
+            }
+        }
+
+        if (isMacOS) {
+            // On macOS, use SystemAudioDump for audio and custom picker for screen
             console.log('Starting macOS capture with SystemAudioDump...');
+            mastermind.setStatus('Choose screen to share...');
+
+            // Show screen picker dialog (like Windows)
+            const appElement = document.querySelector('mastermind-app');
+            const pickerResult = await appElement.showScreenPickerDialog();
+
+            if (pickerResult.cancelled) {
+                mastermind.setStatus('Cancelled');
+                return;
+            }
+
+            mastermind.setStatus('Starting capture...');
 
             // Start macOS audio capture
             const audioResult = await ipcRenderer.invoke('start-macos-audio');
@@ -220,15 +315,19 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
             }
 
-            // Get screen capture for screenshots
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
+            // Get screen capture for screenshots - use wrapper with timeout
+            mediaStream = await getDisplayMediaWithTimeout(
+                {
+                    video: {
+                        frameRate: 1,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: false, // Don't use browser audio on macOS
                 },
-                audio: false, // Don't use browser audio on macOS
-            });
+                45000,
+                2
+            ); // 45 seconds timeout, 2 retry attempts
 
             console.log('macOS screen capture started - audio handled by SystemAudioDump');
 
@@ -399,22 +498,44 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         // Manual mode only - screenshots captured on demand via shortcut
         console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
-        console.error('Error starting capture:', err);
+        console.error('Error starting capture - Type:', err.constructor.name);
+        console.error('Error starting capture - Message:', err.message);
+        console.error('Error starting capture - Name:', err.name);
+        console.error('Error starting capture - Full:', err);
+        console.error('Error starting capture - Stack:', err.stack);
+        console.error('Error starting capture - Keys:', Object.keys(err));
+        logToMain('error', 'Capture error:', {
+            type: err.constructor.name,
+            message: err.message,
+            name: err.name,
+            stack: err.stack,
+        });
 
         // Provide more helpful error messages based on error type
-        let errorMessage = err.message || 'Failed to start capture';
+        let errorMessage = err.message || err.name || 'Failed to start capture';
 
         if (errorMessage.toLowerCase().includes('timeout')) {
-            errorMessage = 'Screen capture timed out. Please try again and select a screen quickly.';
+            errorMessage =
+                'Screen capture timed out. This may be due to:\n' +
+                '• System permissions not granted\n' +
+                '• Screen Recording permission needs to be enabled in System Settings\n' +
+                '• System picker dialog was closed\n\n' +
+                'Please check System Settings > Privacy & Security > Screen Recording';
         } else if (errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('denied')) {
-            errorMessage = 'Screen capture permission denied. Please grant screen recording permission in System Settings.';
+            errorMessage =
+                'Screen capture permission denied.\n' +
+                'Please grant Screen Recording permission in:\n' +
+                'System Settings > Privacy & Security > Screen Recording';
         } else if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('no sources')) {
             errorMessage = 'No screen sources found. Please ensure a display is connected.';
         } else if (errorMessage.toLowerCase().includes('aborted') || errorMessage.toLowerCase().includes('cancel')) {
-            errorMessage = 'Screen selection was cancelled. Please try again.';
+            errorMessage = 'Screen selection was cancelled. Click Start to try again.';
         }
 
         mastermind.setStatus('Error: ' + errorMessage);
+
+        // Show retry button in UI
+        mastermind?.showRetryButton?.();
     }
 }
 

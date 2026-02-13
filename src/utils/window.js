@@ -9,7 +9,6 @@ let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
-
 function createWindow(sendToRenderer, geminiSessionRef) {
     // Get layout preference (default to 'normal')
     let windowWidth = 1100;
@@ -38,49 +37,72 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     // Store selected source for Windows custom picker
     let selectedSourceId = null;
 
-    // Setup display media handler based on platform
-    if (process.platform === 'darwin') {
-        // macOS: Use native system picker
-        session.defaultSession.setDisplayMediaRequestHandler(
-            (request, callback) => {
-                desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                    callback({ video: sources[0], audio: 'loopback' });
-                });
-            },
-            { useSystemPicker: true }
-        );
-    } else {
-        // Windows/Linux: Use selected source from custom picker
-        session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
-            try {
-                const sources = await desktopCapturer.getSources({
-                    types: ['screen', 'window'],
-                    thumbnailSize: { width: 0, height: 0 },
-                });
+    // Setup display media handler - unified approach for all platforms
+    // Use custom picker instead of system picker to avoid macOS timeout issues
+    session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+        try {
+            console.log('[Display Media Handler] Request received, fetching sources...');
 
-                // Find the selected source or use first screen
-                let source = sources[0];
-                if (selectedSourceId) {
-                    const found = sources.find(s => s.id === selectedSourceId);
-                    if (found) source = found;
-                }
+            const sources = await desktopCapturer.getSources({
+                types: ['screen', 'window'],
+                thumbnailSize: { width: 0, height: 0 },
+                fetchWindowIcons: false, // Optimization for faster fetching
+            });
 
-                if (source) {
-                    callback({ video: source, audio: 'loopback' });
+            console.log('[Display Media Handler] Sources fetched:', sources.length);
+
+            // Find the selected source or use first screen
+            let source = sources[0];
+            if (selectedSourceId) {
+                const found = sources.find(s => s.id === selectedSourceId);
+                if (found) {
+                    source = found;
+                    console.log('[Display Media Handler] Using selected source:', source.name);
                 } else {
-                    callback({});
+                    console.warn('[Display Media Handler] Selected source not found, using first available');
                 }
-            } catch (error) {
-                console.error('Error in display media handler:', error);
+            } else {
+                console.log('[Display Media Handler] No source selected, using first available:', source?.name);
+            }
+
+            if (source) {
+                callback({ video: source, audio: 'loopback' });
+                console.log('[Display Media Handler] Callback invoked with source:', source.id);
+            } else {
+                console.error('[Display Media Handler] No sources available');
                 callback({});
             }
-        });
-    }
+        } catch (error) {
+            console.error('[Display Media Handler] Error:', error);
+            callback({});
+        }
+    });
 
     // IPC handler to set selected source
     ipcMain.handle('set-selected-source', async (event, sourceId) => {
         selectedSourceId = sourceId;
         return { success: true };
+    });
+
+    // IPC handler to check screen capture permission (macOS)
+    ipcMain.handle('check-screen-capture-permission', async () => {
+        if (process.platform !== 'darwin') {
+            return { granted: true };
+        }
+
+        try {
+            const { systemPreferences } = require('electron');
+            const status = systemPreferences.getMediaAccessStatus('screen');
+
+            return {
+                granted: status === 'granted',
+                status: status,
+                message: status === 'granted' ? 'Screen recording permission is granted' : `Screen recording permission status: ${status}`,
+            };
+        } catch (error) {
+            console.error('Error checking screen capture permission:', error);
+            return { granted: false, error: error.message };
+        }
     });
 
     mainWindow.setResizable(false);
