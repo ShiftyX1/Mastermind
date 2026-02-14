@@ -56,6 +56,13 @@ const storage = {
     async setGroqApiKey(groqApiKey) {
         return ipcRenderer.invoke('storage:set-groq-api-key', groqApiKey);
     },
+    async getOpenAICompatibleConfig() {
+        const result = await ipcRenderer.invoke('get-openai-compatible-config');
+        return result.success ? result.config : { apiKey: '', baseUrl: '', model: '' };
+    },
+    async setOpenAICompatibleConfig(apiKey, baseUrl, model) {
+        return ipcRenderer.invoke('set-openai-compatible-config', apiKey, baseUrl, model);
+    },
 
     // Preferences
     async getPreferences() {

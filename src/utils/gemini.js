@@ -3,7 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getModelForToday } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, getOpenAICompatibleConfig, incrementCharUsage, getModelForToday } = require('../storage');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
 let _localai = null;
@@ -14,6 +14,9 @@ function getLocalAi() {
 
 // Provider mode: 'byok' or 'local'
 let currentProviderMode = 'byok';
+
+// Response provider: 'gemini', 'groq', or 'openai-compatible'
+let currentResponseProvider = 'gemini';
 
 // Groq conversation history for context
 let groqConversationHistory = [];
@@ -205,6 +208,14 @@ function hasGroqKey() {
     return key && key.trim() != ''
 }
 
+// helper to check if OpenAI-compatible API has been configured
+function hasOpenAICompatibleConfig() {
+    const config = getOpenAICompatibleConfig();
+    return config.apiKey && config.apiKey.trim() !== '' && 
+           config.baseUrl && config.baseUrl.trim() !== '' &&
+           config.model && config.model.trim() !== '';
+}
+
 function trimConversationHistoryForGemma(history, maxChars=42000) {
     if(!history || history.length === 0) return [];
     let totalChars = 0;
@@ -344,6 +355,128 @@ async function sendToGroq(transcription) {
     }
 }
 
+async function sendToOpenAICompatible(transcription) {
+    const config = getOpenAICompatibleConfig();
+    
+    if (!config.apiKey || !config.baseUrl || !config.model) {
+        console.log('OpenAI-compatible API not fully configured');
+        return;
+    }
+
+    if (!transcription || transcription.trim() === '') {
+        console.log('Empty transcription, skipping OpenAI-compatible API');
+        return;
+    }
+
+    console.log(`Sending to OpenAI-compatible API (${config.model}):`, transcription.substring(0, 100) + '...');
+
+    groqConversationHistory.push({
+        role: 'user',
+        content: transcription.trim()
+    });
+
+    if (groqConversationHistory.length > 20) {
+        groqConversationHistory = groqConversationHistory.slice(-20);
+    }
+
+    try {
+        // Ensure baseUrl ends with /v1/chat/completions or contains the full endpoint
+        let apiUrl = config.baseUrl.trim();
+        if (!apiUrl.includes('/chat/completions')) {
+            // Remove trailing slash if present
+            apiUrl = apiUrl.replace(/\/$/, '');
+            // Add OpenAI-compatible endpoint path
+            apiUrl = `${apiUrl}/v1/chat/completions`;
+        }
+
+        console.log(`Using OpenAI-compatible endpoint: ${apiUrl}`);
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${config.apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: config.model,
+                messages: [
+                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+                    ...groqConversationHistory
+                ],
+                stream: true,
+                temperature: 0.7,
+                max_tokens: 2048
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OpenAI-compatible API error:', response.status, errorText);
+            sendToRenderer('update-status', `OpenAI API error: ${response.status}`);
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let isFirst = true;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') continue;
+
+                    try {
+                        const parsed = JSON.parse(data);
+                        const content = parsed.choices?.[0]?.delta?.content;
+
+                        if (content) {
+                            fullText += content;
+                            sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                            isFirst = false;
+                        }
+                    } catch (e) {
+                        // Ignore JSON parse errors from partial chunks
+                    }
+                }
+            }
+        }
+
+        // Clean up <think> tags if present (for DeepSeek-style reasoning models)
+        const cleanText = stripThinkingTags(fullText);
+        if (cleanText !== fullText) {
+            sendToRenderer('update-response', cleanText);
+        }
+
+        if (fullText.trim()) {
+            groqConversationHistory.push({
+                role: 'assistant',
+                content: fullText.trim()
+            });
+
+            if (groqConversationHistory.length > 40) {
+                groqConversationHistory = groqConversationHistory.slice(-40);
+            }
+
+            saveConversationTurn(transcription, fullText);
+        }
+
+        console.log(`OpenAI-compatible API response completed (${config.model})`);
+        sendToRenderer('update-status', 'Listening...');
+
+    } catch (error) {
+        console.error('Error calling OpenAI-compatible API:', error);
+        sendToRenderer('update-status', 'OpenAI API error: ' + error.message);
+    }
+}
+
 async function sendToGemma(transcription) {
     const apiKey = getApiKey();
     if (!apiKey) {
@@ -442,6 +575,14 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         sessionParams = { apiKey, customPrompt, profile, language };
         reconnectAttempts = 0;
     }
+    
+    // Load response provider preference
+    if (!isReconnect) {
+        const { getPreferences } = require('../storage');
+        const prefs = getPreferences();
+        currentResponseProvider = prefs.responseProvider || 'gemini';
+        console.log('🔧 Response provider set to:', currentResponseProvider);
+    }
 
     const client = new GoogleGenAI({
         vertexai: false,
@@ -488,17 +629,32 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     // if (message.serverContent?.outputTranscription?.text) { ... }
 
                     if (message.serverContent?.generationComplete) {
-                        console.log('Generation complete. Current transcription:', `"${currentTranscription}"`);
+                        console.log('✅ Generation complete. Current transcription:', `"${currentTranscription}"`);
                         if (currentTranscription.trim() !== '') {
-                            console.log('Sending to', hasGroqKey() ? 'Groq' : 'Gemma');
-                            if (hasGroqKey()) {
-                                sendToGroq(currentTranscription);
+                            // Use explicit user choice for response provider
+                            if (currentResponseProvider === 'openai-compatible') {
+                                if (hasOpenAICompatibleConfig()) {
+                                    console.log('📤 Sending to OpenAI-compatible API (user selected)');
+                                    sendToOpenAICompatible(currentTranscription);
+                                } else {
+                                    console.log('⚠️  OpenAI-compatible selected but not configured, falling back to Gemini');
+                                    sendToGemma(currentTranscription);
+                                }
+                            } else if (currentResponseProvider === 'groq') {
+                                if (hasGroqKey()) {
+                                    console.log('📤 Sending to Groq (user selected)');
+                                    sendToGroq(currentTranscription);
+                                } else {
+                                    console.log('⚠️  Groq selected but not configured, falling back to Gemini');
+                                    sendToGemma(currentTranscription);
+                                }
                             } else {
+                                console.log('📤 Sending to Gemini (user selected)');
                                 sendToGemma(currentTranscription);
                             }
                             currentTranscription = '';
                         } else {
-                            console.log('Transcription is empty, not sending to LLM');
+                            console.log('⚠️  Transcription is empty, not sending to LLM');
                         }
                         messageBuffer = '';
                     }
@@ -954,8 +1110,19 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         try {
             console.log('Sending text message:', text);
 
-            if (hasGroqKey()) {
-                sendToGroq(text.trim());
+            // Use explicit user choice for response provider
+            if (currentResponseProvider === 'openai-compatible') {
+                if (hasOpenAICompatibleConfig()) {
+                    sendToOpenAICompatible(text.trim());
+                } else {
+                    sendToGemma(text.trim());
+                }
+            } else if (currentResponseProvider === 'groq') {
+                if (hasGroqKey()) {
+                    sendToGroq(text.trim());
+                } else {
+                    sendToGemma(text.trim());
+                }
             } else {
                 sendToGemma(text.trim());
             }
@@ -1053,6 +1220,29 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             return { success: false, error: error.message };
         }
     });
+
+    // OpenAI-compatible API configuration handlers
+    ipcMain.handle('set-openai-compatible-config', async (event, apiKey, baseUrl, model) => {
+        try {
+            const { setOpenAICompatibleConfig } = require('../storage');
+            setOpenAICompatibleConfig(apiKey, baseUrl, model);
+            console.log('OpenAI-compatible config saved:', { baseUrl, model: model.substring(0, 30) });
+            return { success: true };
+        } catch (error) {
+            console.error('Error setting OpenAI-compatible config:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-openai-compatible-config', async (event) => {
+        try {
+            const config = getOpenAICompatibleConfig();
+            return { success: true, config };
+        } catch (error) {
+            console.error('Error getting OpenAI-compatible config:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
 
 module.exports = {
@@ -1071,4 +1261,6 @@ module.exports = {
     sendImageToGeminiHttp,
     setupGeminiIpcHandlers,
     formatSpeakerResults,
+    hasOpenAICompatibleConfig,
+    sendToOpenAICompatible,
 };

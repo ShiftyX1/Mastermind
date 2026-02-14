@@ -414,6 +414,10 @@ export class MainView extends LitElement {
         _geminiKey: { state: true },
         _groqKey: { state: true },
         _openaiKey: { state: true },
+        _openaiCompatibleApiKey: { state: true },
+        _openaiCompatibleBaseUrl: { state: true },
+        _openaiCompatibleModel: { state: true },
+        _responseProvider: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
         // Local AI state
@@ -437,6 +441,10 @@ export class MainView extends LitElement {
         this._geminiKey = '';
         this._groqKey = '';
         this._openaiKey = '';
+        this._openaiCompatibleApiKey = '';
+        this._openaiCompatibleBaseUrl = '';
+        this._openaiCompatibleModel = '';
+        this._responseProvider = 'gemini';
         this._tokenError = false;
         this._keyError = false;
         this._showLocalHelp = false;
@@ -467,6 +475,15 @@ export class MainView extends LitElement {
             this._geminiKey = await cheatingDaddy.storage.getApiKey().catch(() => '') || '';
             this._groqKey = await cheatingDaddy.storage.getGroqApiKey().catch(() => '') || '';
             this._openaiKey = creds.openaiKey || '';
+            
+            // Load OpenAI-compatible config
+            const openaiConfig = await cheatingDaddy.storage.getOpenAICompatibleConfig().catch(() => ({}));
+            this._openaiCompatibleApiKey = openaiConfig.apiKey || '';
+            this._openaiCompatibleBaseUrl = openaiConfig.baseUrl || '';
+            this._openaiCompatibleModel = openaiConfig.model || '';
+            
+            // Load response provider preference
+            this._responseProvider = prefs.responseProvider || 'gemini';
 
             // Load local AI settings
             this._ollamaHost = prefs.ollamaHost || 'http://127.0.0.1:11434';
@@ -631,6 +648,42 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
+    async _saveOpenAICompatibleApiKey(val) {
+        this._openaiCompatibleApiKey = val;
+        await cheatingDaddy.storage.setOpenAICompatibleConfig(
+            val,
+            this._openaiCompatibleBaseUrl,
+            this._openaiCompatibleModel
+        );
+        this.requestUpdate();
+    }
+
+    async _saveOpenAICompatibleBaseUrl(val) {
+        this._openaiCompatibleBaseUrl = val;
+        await cheatingDaddy.storage.setOpenAICompatibleConfig(
+            this._openaiCompatibleApiKey,
+            val,
+            this._openaiCompatibleModel
+        );
+        this.requestUpdate();
+    }
+
+    async _saveOpenAICompatibleModel(val) {
+        this._openaiCompatibleModel = val;
+        await cheatingDaddy.storage.setOpenAICompatibleConfig(
+            this._openaiCompatibleApiKey,
+            this._openaiCompatibleBaseUrl,
+            val
+        );
+        this.requestUpdate();
+    }
+
+    async _saveResponseProvider(val) {
+        this._responseProvider = val;
+        await cheatingDaddy.storage.updatePreference('responseProvider', val);
+        this.requestUpdate();
+    }
+
     async _saveOllamaHost(val) {
         this._ollamaHost = val;
         await cheatingDaddy.storage.updatePreference('ollamaHost', val);
@@ -715,28 +768,74 @@ export class MainView extends LitElement {
                 <label class="form-label">Gemini API Key</label>
                 <input
                     type="password"
-                    placeholder="Required"
+                    placeholder="Required for transcription"
                     .value=${this._geminiKey}
                     @input=${e => this._saveGeminiKey(e.target.value)}
                     class=${this._keyError ? 'error' : ''}
                 />
                 <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get Gemini key</span>
+                    <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get Gemini key</span> - Always used for audio transcription
                 </div>
             </div>
 
             <div class="form-group">
-                <label class="form-label">Groq API Key</label>
-                <input
-                    type="password"
-                    placeholder="Optional"
-                    .value=${this._groqKey}
-                    @input=${e => this._saveGroqKey(e.target.value)}
-                />
+                <label class="form-label">Response Provider</label>
+                <select
+                    .value=${this._responseProvider}
+                    @change=${e => this._saveResponseProvider(e.target.value)}
+                >
+                    <option value="gemini" ?selected=${this._responseProvider === 'gemini'}>Gemini (default)</option>
+                    <option value="groq" ?selected=${this._responseProvider === 'groq'}>Groq (fast responses)</option>
+                    <option value="openai-compatible" ?selected=${this._responseProvider === 'openai-compatible'}>OpenAI-Compatible API</option>
+                </select>
                 <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                    Choose which API to use for generating responses
                 </div>
             </div>
+
+            ${this._responseProvider === 'groq' ? html`
+                <div class="form-group">
+                    <label class="form-label">Groq API Key</label>
+                    <input
+                        type="password"
+                        placeholder="Required for Groq"
+                        .value=${this._groqKey}
+                        @input=${e => this._saveGroqKey(e.target.value)}
+                    />
+                    <div class="form-hint">
+                        <span class="link" @click=${() => this.onExternalLink('https://console.groq.com/keys')}>Get Groq key</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            ${this._responseProvider === 'openai-compatible' ? html`
+                <div class="form-group">
+                    <label class="form-label">OpenAI-Compatible API</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <input
+                            type="password"
+                            placeholder="API Key"
+                            .value=${this._openaiCompatibleApiKey}
+                            @input=${e => this._saveOpenAICompatibleApiKey(e.target.value)}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Base URL (e.g., https://openrouter.ai/api)"
+                            .value=${this._openaiCompatibleBaseUrl}
+                            @input=${e => this._saveOpenAICompatibleBaseUrl(e.target.value)}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Model name (e.g., anthropic/claude-3.5-sonnet)"
+                            .value=${this._openaiCompatibleModel}
+                            @input=${e => this._saveOpenAICompatibleModel(e.target.value)}
+                        />
+                    </div>
+                    <div class="form-hint">
+                        Use OpenRouter, DeepSeek, Together AI, or any OpenAI-compatible API
+                    </div>
+                </div>
+            ` : ''}
 
             ${this._renderStartButton()}
         `;

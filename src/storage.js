@@ -13,7 +13,10 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    groqApiKey: ''
+    groqApiKey: '',
+    openaiCompatibleApiKey: '',
+    openaiCompatibleBaseUrl: '',
+    openaiCompatibleModel: ''
 };
 
 const DEFAULT_PREFERENCES = {
@@ -27,6 +30,7 @@ const DEFAULT_PREFERENCES = {
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
+    responseProvider: 'gemini',
     ollamaHost: 'http://127.0.0.1:11434',
     ollamaModel: 'llama3.1',
     whisperModel: 'Xenova/whisper-small',
@@ -202,6 +206,23 @@ function getGroqApiKey() {
 
 function setGroqApiKey(groqApiKey) {
     return setCredentials({ groqApiKey });
+}
+
+function getOpenAICompatibleConfig() {
+    const creds = getCredentials();
+    return {
+        apiKey: creds.openaiCompatibleApiKey || '',
+        baseUrl: creds.openaiCompatibleBaseUrl || '',
+        model: creds.openaiCompatibleModel || ''
+    };
+}
+
+function setOpenAICompatibleConfig(apiKey, baseUrl, model) {
+    return setCredentials({
+        openaiCompatibleApiKey: apiKey,
+        openaiCompatibleBaseUrl: baseUrl,
+        openaiCompatibleModel: model
+    });
 }
 
 // ============ PREFERENCES ============
@@ -500,6 +521,8 @@ module.exports = {
     setApiKey,
     getGroqApiKey,
     setGroqApiKey,
+    getOpenAICompatibleConfig,
+    setOpenAICompatibleConfig,
 
     // Preferences
     getPreferences,
