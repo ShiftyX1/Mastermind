@@ -242,15 +242,15 @@ export class AppHeader extends LitElement {
 
     getViewTitle() {
         const titles = {
-            onboarding: 'Welcome to Cheating Daddy',
-            main: 'Cheating Daddy',
+            onboarding: 'Welcome to Mastermind',
+            main: 'Mastermind',
             customize: 'Customize',
             help: 'Help & Shortcuts',
             history: 'Conversation History',
             advanced: 'Advanced Tools',
-            assistant: 'Cheating Daddy',
+            assistant: 'Mastermind',
         };
-        return titles[this.currentView] || 'Cheating Daddy';
+        return titles[this.currentView] || 'Mastermind';
     }
 
     getElapsedTime() {

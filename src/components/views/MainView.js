@@ -898,12 +898,12 @@ export class MainView extends LitElement {
             <div class="form-wrapper">
                 ${this._mode === 'local' ? html`
                     <div class="title-row">
-                        <div class="page-title">Cheating Daddy <span class="mode-suffix">Local AI</span></div>
+                        <div class="page-title">Mastermind <span class="mode-suffix">Local AI</span></div>
                         <button class="help-btn" @click=${() => { this._showLocalHelp = !this._showLocalHelp; }}>${this._showLocalHelp ? closeIcon : helpIcon}</button>
                     </div>
                 ` : html`
                     <div class="page-title">
-                        Cheating Daddy <span class="mode-suffix">BYOK</span>
+                        Mastermind <span class="mode-suffix">BYOK</span>
                     </div>
                 `}
                 <div class="page-subtitle">

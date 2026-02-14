@@ -399,7 +399,7 @@ export class CheatingDaddyApp extends LitElement {
             this._localVersion = await cheatingDaddy.getVersion();
             this.requestUpdate();
 
-            const res = await fetch('https://raw.githubusercontent.com/sohzm/cheating-daddy/refs/heads/master/package.json');
+            const res = await fetch('https://raw.githubusercontent.com/ShiftyX1/Mastermind/refs/heads/master/package.json');
             if (!res.ok) return;
             const remote = await res.json();
             const remoteVersion = remote.version;
@@ -782,7 +782,7 @@ export class CheatingDaddyApp extends LitElement {
         return html`
             <div class="sidebar ${this._isLiveMode() ? 'hidden' : ''}">
                 <div class="sidebar-brand">
-                    <h1>Cheating Daddy</h1>
+                    <h1>Mastermind</h1>
                 </div>
                 <nav class="sidebar-nav">
                     ${items.map(item => html`

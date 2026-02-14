@@ -1,8 +1,8 @@
 {
-    "name": "cheating-daddy",
-    "productName": "cheating-daddy",
+    "name": "mastermind",
+    "productName": "Mastermind",
     "version": "0.7.0",
-    "description": "cheating daddy",
+    "description": "Mastermind AI assistant",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
@@ -12,15 +12,15 @@
         "lint": "echo \"No linting configured\""
     },
     "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "mastermind",
+        "mastermind ai",
+        "mastermind ai assistant",
+        "mastermind ai assistant for interviews",
+        "mastermind ai assistant for interviews"
     ],
     "author": {
-        "name": "sohzm",
-        "email": "sohambharambe9@gmail.com"
+        "name": "ShiftyX1",
+        "email": "lead@pyserve.org"
     },
     "license": "GPL-3.0",
     "dependencies": {
