@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
 const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, getOpenAICompatibleConfig, incrementCharUsage, getModelForToday } = require('../storage');
+const OpenAI = require('openai');
 
 // Lazy-loaded to avoid circular dependency (localai.js imports from gemini.js)
 let _localai = null;
@@ -380,72 +381,35 @@ async function sendToOpenAICompatible(transcription) {
     }
 
     try {
-        // Ensure baseUrl ends with /v1/chat/completions or contains the full endpoint
-        let apiUrl = config.baseUrl.trim();
-        if (!apiUrl.includes('/chat/completions')) {
-            // Remove trailing slash if present
-            apiUrl = apiUrl.replace(/\/$/, '');
-            // Add OpenAI-compatible endpoint path
-            apiUrl = `${apiUrl}/v1/chat/completions`;
-        }
-
-        console.log(`Using OpenAI-compatible endpoint: ${apiUrl}`);
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: config.model,
-                messages: [
-                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-                    ...groqConversationHistory
-                ],
-                stream: true,
-                temperature: 0.7,
-                max_tokens: 2048
-            })
+        const client = new OpenAI({
+            apiKey: config.apiKey,
+            baseURL: config.baseUrl.trim().replace(/\/$/, ''),
+            dangerouslyAllowBrowser: false
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OpenAI-compatible API error:', response.status, errorText);
-            sendToRenderer('update-status', `OpenAI API error: ${response.status}`);
-            return;
-        }
+        console.log(`Using OpenAI-compatible base URL: ${config.baseUrl}`);
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+        const stream = await client.chat.completions.create({
+            model: config.model,
+            messages: [
+                { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+                ...groqConversationHistory
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2048
+        });
+
         let fullText = '';
         let isFirst = true;
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6);
-                    if (data === '[DONE]') continue;
-
-                    try {
-                        const parsed = JSON.parse(data);
-                        const content = parsed.choices?.[0]?.delta?.content;
-
-                        if (content) {
-                            fullText += content;
-                            sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                            isFirst = false;
-                        }
-                    } catch (e) {
-                        // Ignore JSON parse errors from partial chunks
-                    }
-                }
+        for await (const chunk of stream) {
+            const content = chunk.choices?.[0]?.delta?.content;
+            
+            if (content) {
+                fullText += content;
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                isFirst = false;
             }
         }
 
@@ -629,32 +593,32 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     // if (message.serverContent?.outputTranscription?.text) { ... }
 
                     if (message.serverContent?.generationComplete) {
-                        console.log('✅ Generation complete. Current transcription:', `"${currentTranscription}"`);
+                        console.log('Generation complete. Current transcription:', `"${currentTranscription}"`);
                         if (currentTranscription.trim() !== '') {
                             // Use explicit user choice for response provider
                             if (currentResponseProvider === 'openai-compatible') {
                                 if (hasOpenAICompatibleConfig()) {
-                                    console.log('📤 Sending to OpenAI-compatible API (user selected)');
+                                    console.log('Sending to OpenAI-compatible API (user selected)');
                                     sendToOpenAICompatible(currentTranscription);
                                 } else {
-                                    console.log('⚠️  OpenAI-compatible selected but not configured, falling back to Gemini');
+                                    console.log('OpenAI-compatible selected but not configured, falling back to Gemini');
                                     sendToGemma(currentTranscription);
                                 }
                             } else if (currentResponseProvider === 'groq') {
                                 if (hasGroqKey()) {
-                                    console.log('📤 Sending to Groq (user selected)');
+                                    console.log('Sending to Groq (user selected)');
                                     sendToGroq(currentTranscription);
                                 } else {
-                                    console.log('⚠️  Groq selected but not configured, falling back to Gemini');
+                                    console.log('Groq selected but not configured, falling back to Gemini');
                                     sendToGemma(currentTranscription);
                                 }
                             } else {
-                                console.log('📤 Sending to Gemini (user selected)');
+                                console.log('Sending to Gemini (user selected)');
                                 sendToGemma(currentTranscription);
                             }
                             currentTranscription = '';
                         } else {
-                            console.log('⚠️  Transcription is empty, not sending to LLM');
+                            console.log('Transcription is empty, not sending to LLM');
                         }
                         messageBuffer = '';
                     }

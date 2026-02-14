@@ -417,6 +417,9 @@ export class MainView extends LitElement {
         _openaiCompatibleApiKey: { state: true },
         _openaiCompatibleBaseUrl: { state: true },
         _openaiCompatibleModel: { state: true },
+        _availableModels: { state: true },
+        _loadingModels: { state: true },
+        _manualModelInput: { state: true },
         _responseProvider: { state: true },
         _tokenError: { state: true },
         _keyError: { state: true },
@@ -444,6 +447,9 @@ export class MainView extends LitElement {
         this._openaiCompatibleApiKey = '';
         this._openaiCompatibleBaseUrl = '';
         this._openaiCompatibleModel = '';
+        this._availableModels = [];
+        this._loadingModels = false;
+        this._manualModelInput = false;
         this._responseProvider = 'gemini';
         this._tokenError = false;
         this._keyError = false;
@@ -491,6 +497,11 @@ export class MainView extends LitElement {
             this._whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
 
             this.requestUpdate();
+            
+            // Auto-load models if OpenAI-compatible is selected and URL is set
+            if (this._responseProvider === 'openai-compatible' && this._openaiCompatibleBaseUrl) {
+                this._loadModels();
+            }
         } catch (e) {
             console.error('Error loading MainView storage:', e);
         }
@@ -505,6 +516,7 @@ export class MainView extends LitElement {
         super.disconnectedCallback();
         document.removeEventListener('keydown', this.boundKeydownHandler);
         if (this._animId) cancelAnimationFrame(this._animId);
+        if (this._loadModelsTimeout) clearTimeout(this._loadModelsTimeout);
     }
 
     updated(changedProperties) {
@@ -656,6 +668,8 @@ export class MainView extends LitElement {
             this._openaiCompatibleModel
         );
         this.requestUpdate();
+        // Auto-load models when both key and URL are set
+        this._debouncedLoadModels();
     }
 
     async _saveOpenAICompatibleBaseUrl(val) {
@@ -666,6 +680,8 @@ export class MainView extends LitElement {
             this._openaiCompatibleModel
         );
         this.requestUpdate();
+        // Auto-load models when both key and URL are set
+        this._debouncedLoadModels();
     }
 
     async _saveOpenAICompatibleModel(val) {
@@ -681,6 +697,79 @@ export class MainView extends LitElement {
     async _saveResponseProvider(val) {
         this._responseProvider = val;
         await cheatingDaddy.storage.updatePreference('responseProvider', val);
+        this.requestUpdate();
+        
+        // Auto-load models when switching to openai-compatible
+        if (val === 'openai-compatible' && this._openaiCompatibleBaseUrl) {
+            this._loadModels();
+        }
+    }
+
+    async _loadModels() {
+        if (this._responseProvider !== 'openai-compatible' || !this._openaiCompatibleBaseUrl) {
+            return;
+        }
+
+        this._loadingModels = true;
+        this._availableModels = [];
+        this.requestUpdate();
+
+        try {
+            let modelsUrl = this._openaiCompatibleBaseUrl.trim();
+            modelsUrl = modelsUrl.replace(/\/$/, '');
+            if (!modelsUrl.includes('/models')) {
+                modelsUrl = modelsUrl.includes('/v1') ? modelsUrl + '/models' : modelsUrl + '/v1/models';
+            }
+
+            console.log('Loading models from:', modelsUrl);
+
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (this._openaiCompatibleApiKey) {
+                headers['Authorization'] = `Bearer ${this._openaiCompatibleApiKey}`;
+            }
+
+            const response = await fetch(modelsUrl, { headers });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.data && Array.isArray(data.data)) {
+                this._availableModels = data.data.map(m => m.id || m.model || m.name).filter(Boolean);
+            } else if (Array.isArray(data)) {
+                this._availableModels = data.map(m => m.id || m.model || m.name || m).filter(Boolean);
+            }
+
+            console.log('Loaded models:', this._availableModels.length);
+            
+            if (this._availableModels.length > 0 && !this._availableModels.includes(this._openaiCompatibleModel)) {
+                await this._saveOpenAICompatibleModel(this._availableModels[0]);
+            }
+        } catch (error) {
+            console.log('Could not load models:', error.message);
+            this._availableModels = [];
+        } finally {
+            this._loadingModels = false;
+            this.requestUpdate();
+        }
+    }
+
+    _debouncedLoadModels() {
+        if (this._loadModelsTimeout) {
+            clearTimeout(this._loadModelsTimeout);
+        }
+        this._loadModelsTimeout = setTimeout(() => {
+            this._loadModels();
+        }, 500);
+    }
+
+    _toggleManualInput() {
+        this._manualModelInput = !this._manualModelInput;
         this.requestUpdate();
     }
 
@@ -824,15 +913,57 @@ export class MainView extends LitElement {
                             .value=${this._openaiCompatibleBaseUrl}
                             @input=${e => this._saveOpenAICompatibleBaseUrl(e.target.value)}
                         />
-                        <input
-                            type="text"
-                            placeholder="Model name (e.g., anthropic/claude-3.5-sonnet)"
-                            .value=${this._openaiCompatibleModel}
-                            @input=${e => this._saveOpenAICompatibleModel(e.target.value)}
-                        />
+                        ${this._loadingModels ? html`
+                            <input
+                                type="text"
+                                placeholder="Loading models..."
+                                disabled
+                                style="opacity: 0.6;"
+                            />
+                        ` : this._availableModels.length > 0 && !this._manualModelInput ? html`
+                            <div style="display: flex; gap: 4px;">
+                                <select
+                                    style="flex: 1;"
+                                    .value=${this._openaiCompatibleModel}
+                                    @change=${e => this._saveOpenAICompatibleModel(e.target.value)}
+                                >
+                                    ${this._availableModels.map(model => html`
+                                        <option value="${model}" ?selected=${this._openaiCompatibleModel === model}>
+                                            ${model}
+                                        </option>
+                                    `)}
+                                </select>
+                                <button
+                                    type="button"
+                                    @click=${() => this._toggleManualInput()}
+                                    style="padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text-muted); font-size: var(--font-size-xs);"
+                                    title="Enter model manually"
+                                >✏️</button>
+                            </div>
+                        ` : html`
+                            <div style="display: flex; gap: 4px;">
+                                <input
+                                    type="text"
+                                    placeholder="Model name (e.g., anthropic/claude-3.5-sonnet)"
+                                    style="flex: 1;"
+                                    .value=${this._openaiCompatibleModel}
+                                    @input=${e => this._saveOpenAICompatibleModel(e.target.value)}
+                                />
+                                ${this._availableModels.length > 0 ? html`
+                                    <button
+                                        type="button"
+                                        @click=${() => this._toggleManualInput()}
+                                        style="padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text-muted); font-size: var(--font-size-xs);"
+                                        title="Select from list"
+                                    >📋</button>
+                                ` : ''}
+                            </div>
+                        `}
                     </div>
                     <div class="form-hint">
-                        Use OpenRouter, DeepSeek, Together AI, or any OpenAI-compatible API
+                        ${this._loadingModels ? 'Loading available models...' : 
+                          this._availableModels.length > 0 ? `${this._availableModels.length} models available` :
+                          'Use OpenRouter, DeepSeek, Together AI, or any OpenAI-compatible API'}
                     </div>
                 </div>
             ` : ''}
