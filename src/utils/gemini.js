@@ -473,10 +473,13 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
                     // Handle input transcription (what was spoken)
                     if (message.serverContent?.inputTranscription?.results) {
-                        currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        const transcribed = formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        console.log('Got transcription (results):', transcribed);
+                        currentTranscription += transcribed;
                     } else if (message.serverContent?.inputTranscription?.text) {
                         const text = message.serverContent.inputTranscription.text;
                         if (text.trim() !== '') {
+                            console.log('Got transcription (text):', text);
                             currentTranscription += text;
                         }
                     }
@@ -485,18 +488,23 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     // if (message.serverContent?.outputTranscription?.text) { ... }
 
                     if (message.serverContent?.generationComplete) {
+                        console.log('Generation complete. Current transcription:', `"${currentTranscription}"`);
                         if (currentTranscription.trim() !== '') {
+                            console.log('Sending to', hasGroqKey() ? 'Groq' : 'Gemma');
                             if (hasGroqKey()) {
                                 sendToGroq(currentTranscription);
                             } else {
                                 sendToGemma(currentTranscription);
                             }
                             currentTranscription = '';
+                        } else {
+                            console.log('Transcription is empty, not sending to LLM');
                         }
                         messageBuffer = '';
                     }
 
                     if (message.serverContent?.turnComplete) {
+                        console.log('Turn complete');
                         sendToRenderer('update-status', 'Listening...');
                     }
                 },
@@ -524,15 +532,10 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             },
             config: {
                 responseModalities: [Modality.AUDIO],
-                proactivity: { proactiveAudio: true },
+                proactivity: { proactiveAudio: false },
                 outputAudioTranscription: {},
+                inputAudioTranscription: {},
                 tools: enabledTools,
-                // Enable speaker diarization
-                // inputAudioTranscription: {
-                //     enableSpeakerDiarization: true,
-                //     minSpeakerCount: 2,
-                //     maxSpeakerCount: 2,
-                // },
                 contextWindowCompression: { slidingWindow: {} },
                 speechConfig: { languageCode: language },
                 systemInstruction: {
