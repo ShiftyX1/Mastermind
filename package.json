@@ -1,8 +1,8 @@
 {
-    "name": "mastermind",
-    "productName": "mastermind",
-    "version": "0.6.0",
-    "description": "Mastermind",
+    "name": "cheating-daddy",
+    "productName": "cheating-daddy",
+    "version": "0.7.0",
+    "description": "cheating daddy",
     "main": "src/index.js",
     "scripts": {
         "start": "electron-forge start",
@@ -12,35 +12,41 @@
         "lint": "echo \"No linting configured\""
     },
     "keywords": [
-        "mastermind",
-        "mastermind ai",
-        "mastermind ai assistant",
-        "mastermind ai assistant for interviews",
-        "mastermind ai assistant for interviews"
+        "cheating daddy",
+        "cheating daddy ai",
+        "cheating daddy ai assistant",
+        "cheating daddy ai assistant for interviews",
+        "cheating daddy ai assistant for interviews"
     ],
     "author": {
-        "name": "ShiftyX1",
-        "email": "lead@pyserve.org"
+        "name": "sohzm",
+        "email": "sohambharambe9@gmail.com"
     },
     "license": "GPL-3.0",
     "dependencies": {
-        "@google/genai": "^1.35.0",
+        "@google/genai": "^1.41.0",
+        "@huggingface/transformers": "^3.8.1",
         "electron-squirrel-startup": "^1.0.1",
-        "openai": "^6.16.0",
-        "ws": "^8.18.0"
+        "ollama": "^0.6.3",
+        "p-retry": "^4.6.2",
+        "ws": "^8.19.0"
     },
     "devDependencies": {
-        "@electron-forge/cli": "^7.11.1",
-        "@electron-forge/maker-deb": "^7.11.1",
-        "@electron-forge/maker-dmg": "^7.11.1",
-        "@electron-forge/maker-rpm": "^7.11.1",
-        "@electron-forge/maker-squirrel": "^7.11.1",
-        "@electron-forge/maker-zip": "^7.11.1",
-        "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
-        "@electron-forge/plugin-fuses": "^7.11.1",
-        "@electron/fuses": "^2.0.0",
-        "@electron/osx-sign": "^2.3.0",
-        "@reforged/maker-appimage": "^5.1.1",
-        "electron": "^39.2.7"
+        "@electron-forge/cli": "^7.8.1",
+        "@electron-forge/maker-deb": "^7.8.1",
+        "@electron-forge/maker-dmg": "^7.8.1",
+        "@electron-forge/maker-rpm": "^7.8.1",
+        "@electron-forge/maker-squirrel": "^7.8.1",
+        "@electron-forge/maker-zip": "^7.8.1",
+        "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
+        "@electron-forge/plugin-fuses": "^7.8.1",
+        "@electron/fuses": "^1.8.0",
+        "@reforged/maker-appimage": "^5.0.0",
+        "electron": "^30.0.5"
+    },
+    "pnpm": {
+        "overrides": {
+            "p-retry": "4.6.2"
+        }
     }
 }

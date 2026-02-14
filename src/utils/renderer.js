@@ -18,29 +18,6 @@ let currentImageQuality = 'medium'; // Store current image quality for manual sc
 
 const isLinux = process.platform === 'linux';
 const isMacOS = process.platform === 'darwin';
-const isWindows = process.platform === 'win32';
-
-// Send logs to main process for file logging
-function logToMain(level, ...args) {
-    const message = args
-        .map(arg => {
-            if (typeof arg === 'object') {
-                try {
-                    return JSON.stringify(arg);
-                } catch {
-                    return String(arg);
-                }
-            }
-            return String(arg);
-        })
-        .join(' ');
-    ipcRenderer.send('renderer-log', { level, message });
-
-    // Also log to console
-    if (level === 'error') console.error(...args);
-    else if (level === 'warn') console.warn(...args);
-    else console.log(...args);
-}
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access
@@ -72,19 +49,12 @@ const storage = {
     async setApiKey(apiKey) {
         return ipcRenderer.invoke('storage:set-api-key', apiKey);
     },
-    async getOpenAICredentials() {
-        const result = await ipcRenderer.invoke('storage:get-openai-credentials');
-        return result.success ? result.data : {};
+    async getGroqApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-groq-api-key');
+        return result.success ? result.data : '';
     },
-    async setOpenAICredentials(config) {
-        return ipcRenderer.invoke('storage:set-openai-credentials', config);
-    },
-    async getOpenAISDKCredentials() {
-        const result = await ipcRenderer.invoke('storage:get-openai-sdk-credentials');
-        return result.success ? result.data : {};
-    },
-    async setOpenAISDKCredentials(config) {
-        return ipcRenderer.invoke('storage:set-openai-sdk-credentials', config);
+    async setGroqApiKey(groqApiKey) {
+        return ipcRenderer.invoke('storage:set-groq-api-key', groqApiKey);
     },
 
     // Preferences
@@ -136,18 +106,7 @@ const storage = {
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
-    },
-
-    // Migration
-    hasOldConfig() {
-        // Note: This is synchronous in the main process, but we need to use invoke which is async
-        // So we'll make this return a promise
-        return ipcRenderer.invoke('storage:has-old-config').then(result => (result.success ? result.data : false));
-    },
-    async migrateFromOldConfig() {
-        const result = await ipcRenderer.invoke('storage:migrate-from-old-config');
-        return result.success ? result.data : false;
-    },
+    }
 };
 
 // Cache for preferences to avoid async calls in hot paths
@@ -182,23 +141,39 @@ function arrayBufferToBase64(buffer) {
 }
 
 async function initializeGemini(profile = 'interview', language = 'en-US') {
+    const apiKey = await storage.getApiKey();
+    if (apiKey) {
+        const prefs = await storage.getPreferences();
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
+        if (success) {
+            cheatingDaddy.setStatus('Live');
+        } else {
+            cheatingDaddy.setStatus('error');
+        }
+    }
+}
+
+async function initializeLocal(profile = 'interview') {
     const prefs = await storage.getPreferences();
-    const success = await ipcRenderer.invoke('initialize-ai-session', prefs.customPrompt || '', profile, language);
+    const ollamaHost = prefs.ollamaHost || 'http://127.0.0.1:11434';
+    const ollamaModel = prefs.ollamaModel || 'llama3.1';
+    const whisperModel = prefs.whisperModel || 'Xenova/whisper-small';
+    const customPrompt = prefs.customPrompt || '';
+
+    const success = await ipcRenderer.invoke('initialize-local', ollamaHost, ollamaModel, whisperModel, profile, customPrompt);
     if (success) {
-        mastermind.setStatus('Live');
+        cheatingDaddy.setStatus('Local AI Live');
+        return true;
     } else {
-        mastermind.setStatus('Error: Failed to initialize AI session Gemini');
+        cheatingDaddy.setStatus('error');
+        return false;
     }
 }
 
 // Listen for status updates
 ipcRenderer.on('update-status', (event, status) => {
     console.log('Status update:', status);
-    mastermind.setStatus(status);
-});
-
-ipcRenderer.on('push-to-talk-toggle', () => {
-    ipcRenderer.send('push-to-talk-toggle');
+    cheatingDaddy.setStatus(status);
 });
 
 async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
@@ -315,21 +290,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
 
             console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
         } else {
-            // Windows - show custom screen picker first
-            logToMain('info', '=== Starting Windows audio capture ===');
-            mastermind.setStatus('Choose screen to share...');
-
-            // Show screen picker dialog
-            const appElement = document.querySelector('mastermind-app');
-            const pickerResult = await appElement.showScreenPickerDialog();
-
-            if (pickerResult.cancelled) {
-                mastermind.setStatus('Cancelled');
-                return;
-            }
-
-            mastermind.setStatus('Starting capture...');
-
+            // Windows - use display media with loopback for system audio
             mediaStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     frameRate: 1,
@@ -345,29 +306,10 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 },
             });
 
-            const audioTracks = mediaStream.getAudioTracks();
-            const videoTracks = mediaStream.getVideoTracks();
+            console.log('Windows capture started with loopback audio');
 
-            logToMain('info', 'Windows capture result:', {
-                hasVideo: videoTracks.length > 0,
-                hasAudio: audioTracks.length > 0,
-                audioTrackInfo: audioTracks.map(t => ({
-                    label: t.label,
-                    enabled: t.enabled,
-                    muted: t.muted,
-                    readyState: t.readyState,
-                    settings: t.getSettings(),
-                })),
-            });
-
-            if (audioTracks.length === 0) {
-                logToMain('warn', 'WARNING: No audio tracks! User must check "Share audio" in screen picker dialog');
-                mastermind.setStatus('Warning: No audio - enable "Share audio" checkbox');
-            } else {
-                logToMain('info', 'Audio track acquired, setting up processing...');
-                // Setup audio processing for Windows loopback audio only
-                setupWindowsLoopbackProcessing();
-            }
+            // Setup audio processing for Windows loopback audio only
+            setupWindowsLoopbackProcessing();
 
             if (audioMode === 'mic_only' || audioMode === 'both') {
                 let micStream = null;
@@ -400,21 +342,7 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
         console.log('Manual mode enabled - screenshots will be captured on demand only');
     } catch (err) {
         console.error('Error starting capture:', err);
-
-        // Provide more helpful error messages based on error type
-        let errorMessage = err.message || 'Failed to start capture';
-
-        if (errorMessage.toLowerCase().includes('timeout')) {
-            errorMessage = 'Screen capture timed out. Please try again and select a screen quickly.';
-        } else if (errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('denied')) {
-            errorMessage = 'Screen capture permission denied. Please grant screen recording permission in System Settings.';
-        } else if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('no sources')) {
-            errorMessage = 'No screen sources found. Please ensure a display is connected.';
-        } else if (errorMessage.toLowerCase().includes('aborted') || errorMessage.toLowerCase().includes('cancel')) {
-            errorMessage = 'Screen selection was cancelled. Please try again.';
-        }
-
-        mastermind.setStatus('Error: ' + errorMessage);
+        cheatingDaddy.setStatus('error');
     }
 }
 
@@ -483,75 +411,32 @@ function setupLinuxSystemAudioProcessing() {
 
 function setupWindowsLoopbackProcessing() {
     // Setup audio processing for Windows loopback audio only
-    logToMain('info', 'Setting up Windows loopback audio processing...');
+    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    try {
-        audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    let audioBuffer = [];
+    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-        logToMain('info', 'AudioContext created:', {
-            state: audioContext.state,
-            sampleRate: audioContext.sampleRate,
-        });
+    audioProcessor.onaudioprocess = async e => {
+        const inputData = e.inputBuffer.getChannelData(0);
+        audioBuffer.push(...inputData);
 
-        // Resume AudioContext if suspended (Chrome policy)
-        if (audioContext.state === 'suspended') {
-            logToMain('warn', 'AudioContext suspended, attempting resume...');
-            audioContext
-                .resume()
-                .then(() => {
-                    logToMain('info', 'AudioContext resumed successfully');
-                })
-                .catch(err => {
-                    logToMain('error', 'Failed to resume AudioContext:', err.message);
-                });
+        // Process audio in chunks
+        while (audioBuffer.length >= samplesPerChunk) {
+            const chunk = audioBuffer.splice(0, samplesPerChunk);
+            const pcmData16 = convertFloat32ToInt16(chunk);
+            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+            await ipcRenderer.invoke('send-audio-content', {
+                data: base64Data,
+                mimeType: 'audio/pcm;rate=24000',
+            });
         }
+    };
 
-        const source = audioContext.createMediaStreamSource(mediaStream);
-        audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-
-        let audioBuffer = [];
-        const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
-        let chunkCount = 0;
-        let totalSamples = 0;
-
-        audioProcessor.onaudioprocess = async e => {
-            const inputData = e.inputBuffer.getChannelData(0);
-            audioBuffer.push(...inputData);
-            totalSamples += inputData.length;
-
-            // Process audio in chunks
-            while (audioBuffer.length >= samplesPerChunk) {
-                const chunk = audioBuffer.splice(0, samplesPerChunk);
-                const pcmData16 = convertFloat32ToInt16(chunk);
-                const base64Data = arrayBufferToBase64(pcmData16.buffer);
-
-                await ipcRenderer.invoke('send-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
-
-                chunkCount++;
-
-                // Log progress every 100 chunks (~10 seconds)
-                if (chunkCount === 1) {
-                    logToMain('info', 'First audio chunk sent to AI');
-                    mastermind.setStatus('Listening...');
-                } else if (chunkCount % 100 === 0) {
-                    // Calculate max amplitude to check if we're getting real audio
-                    const maxAmp = Math.max(...chunk.map(Math.abs));
-                    logToMain('info', `Audio progress: ${chunkCount} chunks, maxAmplitude: ${maxAmp.toFixed(4)}`);
-                }
-            }
-        };
-
-        source.connect(audioProcessor);
-        audioProcessor.connect(audioContext.destination);
-
-        logToMain('info', 'Windows audio processing pipeline connected');
-    } catch (err) {
-        logToMain('error', 'Error setting up Windows audio:', err.message, err.stack);
-        mastermind.setStatus('Audio error: ' + err.message);
-    }
+    source.connect(audioProcessor);
+    audioProcessor.connect(audioContext.destination);
 }
 
 async function captureScreenshot(imageQuality = 'medium', isManual = false) {
@@ -646,183 +531,10 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
     );
 }
 
-const MANUAL_SCREENSHOT_PROMPT = `You are an expert AI assistant analyzing a screenshot. Your task is to understand what the user needs help with and provide the most useful response.
-
-**ANALYSIS APPROACH:**
-1. First, identify what's shown on the screen (code editor, math problem, website, document, exam, etc.)
-2. Determine what the user likely needs (explanation, solution, answer, debugging help, etc.)
-3. Provide a direct, actionable response
-
-**RESPONSE GUIDELINES BY CONTEXT:**
-
-**If it's CODE (LeetCode, HackerRank, coding interview, IDE):**
-- Identify the programming language and problem type
-- Provide a brief explanation of the approach (2-3 bullet points max)
-- Give the complete, working code solution
-- Include time/space complexity if relevant
-- If there's an error, explain the fix
-
-**If it's MATH or SCIENCE:**
-- Show step-by-step solution
-- Use proper mathematical notation with LaTeX ($..$ for inline, $$...$$ for blocks)
-- Provide the final answer clearly marked
-- Include any relevant formulas used
-
-**If it's MCQ/EXAM/QUIZ:**
-- State the correct answer immediately and clearly (e.g., "**Answer: B**")
-- Provide brief justification (1-2 sentences)
-- If multiple questions visible, answer all of them
-
-**If it's a DOCUMENT/ARTICLE/WEBSITE:**
-- Summarize the key information
-- Answer any specific questions if apparent
-- Highlight important points
-
-**If it's a FORM/APPLICATION:**
-- Help fill in the required information
-- Suggest appropriate responses
-- Point out any issues or missing fields
-
-**If it's an ERROR/DEBUG scenario:**
-- Identify the error type and cause
-- Provide the fix immediately
-- Explain briefly why it occurred
-
-**FORMAT REQUIREMENTS:**
-- Use **markdown** for formatting
-- Use **bold** for key answers and important points
-- Use code blocks with language specification for code
-- Be concise but complete - no unnecessary explanations
-- No pleasantries or filler text - get straight to the answer
-
-**CRITICAL:** Provide the complete answer. Don't ask for clarification - make reasonable assumptions and deliver value immediately.`;
-
-// ============ REGION SELECTION ============
-// Uses a separate fullscreen window to allow selection outside the app window
-
-async function startRegionSelection() {
-    console.log('Starting region selection...');
-
-    if (!mediaStream) {
-        console.error('No media stream available. Please start capture first.');
-        mastermind?.addNewResponse('Please start screen capture first before selecting a region.');
-        return;
-    }
-
-    // Ensure video is ready
-    if (!hiddenVideo) {
-        hiddenVideo = document.createElement('video');
-        hiddenVideo.srcObject = mediaStream;
-        hiddenVideo.muted = true;
-        hiddenVideo.playsInline = true;
-        await hiddenVideo.play();
-
-        await new Promise(resolve => {
-            if (hiddenVideo.readyState >= 2) return resolve();
-            hiddenVideo.onloadedmetadata = () => resolve();
-        });
-
-        // Initialize canvas
-        offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = hiddenVideo.videoWidth;
-        offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
-    }
-
-    if (hiddenVideo.readyState < 2) {
-        console.warn('Video not ready yet');
-        return;
-    }
-
-    // Capture current screen to show in selection window
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-    const screenshotDataUrl = offscreenCanvas.toDataURL('image/jpeg', 0.9);
-
-    // Request main process to create selection window
-    const result = await ipcRenderer.invoke('start-region-selection', { screenshotDataUrl });
-
-    if (result.success && result.rect) {
-        // Capture the selected region from the screenshot
-        await captureRegionFromScreenshot(result.rect, screenshotDataUrl);
-    } else if (result.cancelled) {
-        console.log('Region selection cancelled');
-    } else if (result.error) {
-        console.error('Region selection error:', result.error);
-    }
-}
-
-async function captureRegionFromScreenshot(rect, screenshotDataUrl) {
-    console.log('Capturing region from screenshot:', rect);
-
-    // Load the screenshot into an image
-    const img = new Image();
-    img.src = screenshotDataUrl;
-
-    await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-    });
-
-    // Calculate scale factor (screenshot might have different resolution than display)
-    // The selection coordinates are in screen pixels, we need to map to image pixels
-    const scaleX = img.naturalWidth / window.screen.width;
-    const scaleY = img.naturalHeight / window.screen.height;
-
-    // Scale the selection rectangle
-    const scaledRect = {
-        left: Math.round(rect.left * scaleX),
-        top: Math.round(rect.top * scaleY),
-        width: Math.round(rect.width * scaleX),
-        height: Math.round(rect.height * scaleY),
-    };
-
-    // Create canvas for the cropped region
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = scaledRect.width;
-    cropCanvas.height = scaledRect.height;
-    const cropContext = cropCanvas.getContext('2d');
-
-    // Draw only the selected region
-    cropContext.drawImage(img, scaledRect.left, scaledRect.top, scaledRect.width, scaledRect.height, 0, 0, scaledRect.width, scaledRect.height);
-
-    // Convert to blob and send
-    cropCanvas.toBlob(
-        async blob => {
-            if (!blob) {
-                console.error('Failed to create blob from cropped region');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-
-                if (!base64data || base64data.length < 100) {
-                    console.error('Invalid base64 data generated');
-                    return;
-                }
-
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                    prompt: MANUAL_SCREENSHOT_PROMPT,
-                });
-
-                if (result.success) {
-                    console.log(`Region capture response completed from ${result.model}`);
-                } else {
-                    console.error('Failed to get region capture response:', result.error);
-                    mastermind.addNewResponse(`Error: ${result.error}`);
-                }
-            };
-            reader.readAsDataURL(blob);
-        },
-        'image/jpeg',
-        0.9
-    );
-}
-
-// Expose to global scope
-window.startRegionSelection = startRegionSelection;
+const MANUAL_SCREENSHOT_PROMPT = `Help me on this page, give me the answer no bs, complete answer.
+So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
+If its a question about the website, give me the answer no bs, complete answer.
+If its a mcq question, give me the answer no bs, complete answer.`;
 
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
@@ -859,21 +571,33 @@ async function captureManualScreenshot(imageQuality = null) {
         return;
     }
 
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
+    // Downscale to max 1280px wide for faster transfer — vision models don't need 4K
+    const MAX_WIDTH = 1280;
+    const srcW = hiddenVideo.videoWidth;
+    const srcH = hiddenVideo.videoHeight;
+    let destW = srcW;
+    let destH = srcH;
+    if (srcW > MAX_WIDTH) {
+        destW = MAX_WIDTH;
+        destH = Math.round(srcH * (MAX_WIDTH / srcW));
+    }
+    offscreenCanvas.width = destW;
+    offscreenCanvas.height = destH;
+    offscreenContext.drawImage(hiddenVideo, 0, 0, destW, destH);
 
     let qualityValue;
     switch (quality) {
         case 'high':
-            qualityValue = 0.9;
+            qualityValue = 0.85;
             break;
         case 'medium':
-            qualityValue = 0.7;
+            qualityValue = 0.6;
             break;
         case 'low':
-            qualityValue = 0.5;
+            qualityValue = 0.4;
             break;
         default:
-            qualityValue = 0.7;
+            qualityValue = 0.6;
     }
 
     offscreenCanvas.toBlob(
@@ -892,6 +616,8 @@ async function captureManualScreenshot(imageQuality = null) {
                     return;
                 }
 
+                console.log(`Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`);
+
                 // Send image with prompt to HTTP API (response streams via IPC events)
                 const result = await ipcRenderer.invoke('send-image-content', {
                     data: base64data,
@@ -903,7 +629,7 @@ async function captureManualScreenshot(imageQuality = null) {
                     // Response already displayed via streaming events (new-response/update-response)
                 } else {
                     console.error('Failed to get image response:', result.error);
-                    mastermind.addNewResponse(`Error: ${result.error}`);
+                    cheatingDaddy.addNewResponse(`Error: ${result.error}`);
                 }
             };
             reader.readAsDataURL(blob);
@@ -996,7 +722,7 @@ ipcRenderer.on('save-session-context', async (event, data) => {
     try {
         await storage.saveSession(data.sessionId, {
             profile: data.profile,
-            customPrompt: data.customPrompt,
+            customPrompt: data.customPrompt
         });
         console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
     } catch (error) {
@@ -1010,7 +736,7 @@ ipcRenderer.on('save-screen-analysis', async (event, data) => {
         await storage.saveSession(data.sessionId, {
             screenAnalysisHistory: data.fullHistory,
             profile: data.profile,
-            customPrompt: data.customPrompt,
+            customPrompt: data.customPrompt
         });
         console.log('Screen analysis saved:', data.sessionId);
     } catch (error) {
@@ -1026,11 +752,11 @@ ipcRenderer.on('clear-sensitive-data', async () => {
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = mastermind.getCurrentView();
+    const currentView = cheatingDaddy.getCurrentView();
 
     if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
         if (currentView === 'main') {
-            mastermind.element().handleStart();
+            cheatingDaddy.element().handleStart();
         } else {
             captureManualScreenshot();
         }
@@ -1038,108 +764,82 @@ function handleShortcut(shortcutKey) {
 }
 
 // Create reference to the main app element
-const mastermindApp = document.querySelector('mastermind-app');
+const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
 // ============ THEME SYSTEM ============
 const theme = {
     themes: {
         dark: {
-            background: '#1e1e1e',
-            text: '#e0e0e0',
-            textSecondary: '#a0a0a0',
-            textMuted: '#6b6b6b',
-            border: '#333333',
-            accent: '#ffffff',
-            btnPrimaryBg: '#ffffff',
-            btnPrimaryText: '#000000',
-            btnPrimaryHover: '#e0e0e0',
-            tooltipBg: '#1a1a1a',
-            tooltipText: '#ffffff',
-            keyBg: 'rgba(255,255,255,0.1)',
+            background: '#101010',
+            text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
+            border: '#2a2a2a', accent: '#ffffff',
+            btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
+            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
+            keyBg: 'rgba(255,255,255,0.1)'
         },
         light: {
             background: '#ffffff',
-            text: '#1a1a1a',
-            textSecondary: '#555555',
-            textMuted: '#888888',
-            border: '#e0e0e0',
-            accent: '#000000',
-            btnPrimaryBg: '#1a1a1a',
-            btnPrimaryText: '#ffffff',
-            btnPrimaryHover: '#333333',
-            tooltipBg: '#1a1a1a',
-            tooltipText: '#ffffff',
-            keyBg: 'rgba(0,0,0,0.1)',
+            text: '#1a1a1a', textSecondary: '#555555', textMuted: '#888888',
+            border: '#e0e0e0', accent: '#000000',
+            btnPrimaryBg: '#1a1a1a', btnPrimaryText: '#ffffff', btnPrimaryHover: '#333333',
+            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
+            keyBg: 'rgba(0,0,0,0.1)'
         },
         midnight: {
             background: '#0d1117',
-            text: '#c9d1d9',
-            textSecondary: '#8b949e',
-            textMuted: '#6e7681',
-            border: '#30363d',
-            accent: '#58a6ff',
-            btnPrimaryBg: '#58a6ff',
-            btnPrimaryText: '#0d1117',
-            btnPrimaryHover: '#79b8ff',
-            tooltipBg: '#161b22',
-            tooltipText: '#c9d1d9',
-            keyBg: 'rgba(88,166,255,0.15)',
+            text: '#c9d1d9', textSecondary: '#8b949e', textMuted: '#6e7681',
+            border: '#30363d', accent: '#58a6ff',
+            btnPrimaryBg: '#58a6ff', btnPrimaryText: '#0d1117', btnPrimaryHover: '#79b8ff',
+            tooltipBg: '#161b22', tooltipText: '#c9d1d9',
+            keyBg: 'rgba(88,166,255,0.15)'
         },
         sepia: {
             background: '#f4ecd8',
-            text: '#5c4b37',
-            textSecondary: '#7a6a56',
-            textMuted: '#998875',
-            border: '#d4c8b0',
-            accent: '#8b4513',
-            btnPrimaryBg: '#5c4b37',
-            btnPrimaryText: '#f4ecd8',
-            btnPrimaryHover: '#7a6a56',
-            tooltipBg: '#5c4b37',
-            tooltipText: '#f4ecd8',
-            keyBg: 'rgba(92,75,55,0.15)',
+            text: '#5c4b37', textSecondary: '#7a6a56', textMuted: '#998875',
+            border: '#d4c8b0', accent: '#8b4513',
+            btnPrimaryBg: '#5c4b37', btnPrimaryText: '#f4ecd8', btnPrimaryHover: '#7a6a56',
+            tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
+            keyBg: 'rgba(92,75,55,0.15)'
         },
-        nord: {
-            background: '#2e3440',
-            text: '#eceff4',
-            textSecondary: '#d8dee9',
-            textMuted: '#4c566a',
-            border: '#3b4252',
-            accent: '#88c0d0',
-            btnPrimaryBg: '#88c0d0',
-            btnPrimaryText: '#2e3440',
-            btnPrimaryHover: '#8fbcbb',
-            tooltipBg: '#3b4252',
-            tooltipText: '#eceff4',
-            keyBg: 'rgba(136,192,208,0.15)',
+        catppuccin: {
+            background: '#1e1e2e',
+            text: '#cdd6f4', textSecondary: '#a6adc8', textMuted: '#585b70',
+            border: '#313244', accent: '#cba6f7',
+            btnPrimaryBg: '#cba6f7', btnPrimaryText: '#1e1e2e', btnPrimaryHover: '#b4befe',
+            tooltipBg: '#313244', tooltipText: '#cdd6f4',
+            keyBg: 'rgba(203,166,247,0.12)'
         },
-        dracula: {
-            background: '#282a36',
-            text: '#f8f8f2',
-            textSecondary: '#bd93f9',
-            textMuted: '#6272a4',
-            border: '#44475a',
-            accent: '#ff79c6',
-            btnPrimaryBg: '#ff79c6',
-            btnPrimaryText: '#282a36',
-            btnPrimaryHover: '#ff92d0',
-            tooltipBg: '#44475a',
-            tooltipText: '#f8f8f2',
-            keyBg: 'rgba(255,121,198,0.15)',
+        gruvbox: {
+            background: '#1d2021',
+            text: '#ebdbb2', textSecondary: '#a89984', textMuted: '#665c54',
+            border: '#3c3836', accent: '#fe8019',
+            btnPrimaryBg: '#fe8019', btnPrimaryText: '#1d2021', btnPrimaryHover: '#fabd2f',
+            tooltipBg: '#3c3836', tooltipText: '#ebdbb2',
+            keyBg: 'rgba(254,128,25,0.12)'
         },
-        abyss: {
-            background: '#0a0a0a',
-            text: '#d4d4d4',
-            textSecondary: '#808080',
-            textMuted: '#505050',
-            border: '#1a1a1a',
-            accent: '#ffffff',
-            btnPrimaryBg: '#ffffff',
-            btnPrimaryText: '#0a0a0a',
-            btnPrimaryHover: '#d4d4d4',
-            tooltipBg: '#141414',
-            tooltipText: '#d4d4d4',
-            keyBg: 'rgba(255,255,255,0.08)',
+        rosepine: {
+            background: '#191724',
+            text: '#e0def4', textSecondary: '#908caa', textMuted: '#6e6a86',
+            border: '#26233a', accent: '#ebbcba',
+            btnPrimaryBg: '#ebbcba', btnPrimaryText: '#191724', btnPrimaryHover: '#f6c177',
+            tooltipBg: '#26233a', tooltipText: '#e0def4',
+            keyBg: 'rgba(235,188,186,0.12)'
+        },
+        solarized: {
+            background: '#002b36',
+            text: '#93a1a1', textSecondary: '#839496', textMuted: '#586e75',
+            border: '#073642', accent: '#2aa198',
+            btnPrimaryBg: '#2aa198', btnPrimaryText: '#002b36', btnPrimaryHover: '#268bd2',
+            tooltipBg: '#073642', tooltipText: '#93a1a1',
+            keyBg: 'rgba(42,161,152,0.12)'
+        },
+        tokyonight: {
+            background: '#1a1b26',
+            text: '#c0caf5', textSecondary: '#9aa5ce', textMuted: '#565f89',
+            border: '#292e42', accent: '#7aa2f7',
+            btnPrimaryBg: '#7aa2f7', btnPrimaryText: '#1a1b26', btnPrimaryHover: '#bb9af7',
+            tooltipBg: '#292e42', tooltipText: '#c0caf5',
+            keyBg: 'rgba(122,162,247,0.12)'
         },
     },
 
@@ -1155,33 +855,33 @@ const theme = {
             light: 'Light',
             midnight: 'Midnight Blue',
             sepia: 'Sepia',
-            nord: 'Nord',
-            dracula: 'Dracula',
-            abyss: 'Abyss',
+            catppuccin: 'Catppuccin Mocha',
+            gruvbox: 'Gruvbox Dark',
+            rosepine: 'Ros\u00e9 Pine',
+            solarized: 'Solarized Dark',
+            tokyonight: 'Tokyo Night'
         };
         return Object.keys(this.themes).map(key => ({
             value: key,
             name: names[key] || key,
-            colors: this.themes[key],
+            colors: this.themes[key]
         }));
     },
 
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result
-            ? {
-                  r: parseInt(result[1], 16),
-                  g: parseInt(result[2], 16),
-                  b: parseInt(result[3], 16),
-              }
-            : { r: 30, g: 30, b: 30 };
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 30, g: 30, b: 30 };
     },
 
     lightenColor(rgb, amount) {
         return {
             r: Math.min(255, rgb.r + amount),
             g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount),
+            b: Math.min(255, rgb.b + amount)
         };
     },
 
@@ -1189,7 +889,7 @@ const theme = {
         return {
             r: Math.max(0, rgb.r - amount),
             g: Math.max(0, rgb.g - amount),
-            b: Math.max(0, rgb.b - amount),
+            b: Math.max(0, rgb.b - amount)
         };
     },
 
@@ -1201,20 +901,31 @@ const theme = {
         const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
         const adjust = isLight ? this.darkenColor.bind(this) : this.lightenColor.bind(this);
 
-        const secondary = adjust(baseRgb, 7);
-        const tertiary = adjust(baseRgb, 15);
-        const hover = adjust(baseRgb, 20);
+        const secondary = adjust(baseRgb, 10);
+        const tertiary = adjust(baseRgb, 22);
+        const hover = adjust(baseRgb, 28);
 
-        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
-        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`;
+        const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`;
+        const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`;
+        const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`;
+
+        // New design tokens (used by components)
+        root.style.setProperty('--bg-app', bgBase);
+        root.style.setProperty('--bg-surface', bgSurface);
+        root.style.setProperty('--bg-elevated', bgElevated);
+        root.style.setProperty('--bg-hover', bgHover);
+
+        // Legacy aliases
+        root.style.setProperty('--header-background', bgBase);
+        root.style.setProperty('--main-content-background', bgBase);
+        root.style.setProperty('--bg-primary', bgBase);
+        root.style.setProperty('--bg-secondary', bgSurface);
+        root.style.setProperty('--bg-tertiary', bgElevated);
+        root.style.setProperty('--input-background', bgElevated);
+        root.style.setProperty('--input-focus-background', bgElevated);
+        root.style.setProperty('--hover-background', bgHover);
+        root.style.setProperty('--scrollbar-background', bgBase);
     },
 
     apply(themeName, alpha = 0.8) {
@@ -1222,14 +933,19 @@ const theme = {
         this.current = themeName;
         const root = document.documentElement;
 
-        // Text colors
-        root.style.setProperty('--text-color', colors.text);
+        // New design tokens (used by components)
+        root.style.setProperty('--text-primary', colors.text);
         root.style.setProperty('--text-secondary', colors.textSecondary);
         root.style.setProperty('--text-muted', colors.textMuted);
-        // Border colors
+        root.style.setProperty('--border', colors.border);
+        root.style.setProperty('--border-strong', colors.accent);
+        root.style.setProperty('--accent', colors.btnPrimaryBg);
+        root.style.setProperty('--accent-hover', colors.btnPrimaryHover);
+
+        // Legacy aliases
+        root.style.setProperty('--text-color', colors.text);
         root.style.setProperty('--border-color', colors.border);
         root.style.setProperty('--border-default', colors.accent);
-        // Misc
         root.style.setProperty('--placeholder-color', colors.textMuted);
         root.style.setProperty('--scrollbar-thumb', colors.border);
         root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);
@@ -1269,29 +985,30 @@ const theme = {
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
         this.apply(themeName);
-    },
+    }
 };
 
-// Consolidated mastermind object - all functions in one place
-const mastermind = {
+// Consolidated cheatingDaddy object - all functions in one place
+const cheatingDaddy = {
     // App version
     getVersion: async () => ipcRenderer.invoke('get-app-version'),
 
     // Element access
-    element: () => mastermindApp,
-    e: () => mastermindApp,
+    element: () => cheatingDaddyApp,
+    e: () => cheatingDaddyApp,
 
     // App state functions - access properties directly from the app element
-    getCurrentView: () => mastermindApp.currentView,
-    getLayoutMode: () => mastermindApp.layoutMode,
+    getCurrentView: () => cheatingDaddyApp.currentView,
+    getLayoutMode: () => cheatingDaddyApp.layoutMode,
 
     // Status and response functions
-    setStatus: text => mastermindApp.setStatus(text),
-    addNewResponse: response => mastermindApp.addNewResponse(response),
-    updateCurrentResponse: response => mastermindApp.updateCurrentResponse(response),
+    setStatus: text => cheatingDaddyApp.setStatus(text),
+    addNewResponse: response => cheatingDaddyApp.addNewResponse(response),
+    updateCurrentResponse: response => cheatingDaddyApp.updateCurrentResponse(response),
 
     // Core functionality
     initializeGemini,
+    initializeLocal,
     startCapture,
     stopCapture,
     sendTextMessage,
@@ -1312,7 +1029,7 @@ const mastermind = {
 };
 
 // Make it globally available
-window.mastermind = mastermind;
+window.cheatingDaddy = cheatingDaddy;
 
 // Load theme after DOM is ready
 if (document.readyState === 'loading') {

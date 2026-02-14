@@ -4,20 +4,11 @@ if (require('electron-squirrel-startup')) {
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
-const { setupAIProviderIpcHandlers } = require('./utils/ai-provider-manager');
-const { stopMacOSAudioCapture } = require('./utils/gemini');
-const { initLogger, closeLogger, getLogPath } = require('./utils/logger');
+const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
-
-function sendToRenderer(channel, data) {
-    const windows = BrowserWindow.getAllWindows();
-    if (windows.length > 0) {
-        windows[0].webContents.send(channel, data);
-    }
-}
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
@@ -25,33 +16,23 @@ function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
-    // Initialize file logger first
-    const logPath = initLogger();
-    console.log('App starting, log file:', logPath);
-
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
 
+    // Trigger screen recording permission prompt on macOS if not already granted
+    if (process.platform === 'darwin') {
+        const { desktopCapturer } = require('electron');
+        desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
+    }
+
     createMainWindow();
-    setupAIProviderIpcHandlers(geminiSessionRef);
+    setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
     setupGeneralIpcHandlers();
-
-    // Add handler to get log path from renderer
-    ipcMain.handle('get-log-path', () => getLogPath());
-
-    // Add handler for renderer logs (so they go to the log file)
-    ipcMain.on('renderer-log', (event, { level, message }) => {
-        const prefix = '[RENDERER]';
-        if (level === 'error') console.error(prefix, message);
-        else if (level === 'warn') console.warn(prefix, message);
-        else console.log(prefix, message);
-    });
 });
 
 app.on('window-all-closed', () => {
     stopMacOSAudioCapture();
-    closeLogger();
     if (process.platform !== 'darwin') {
         app.quit();
     }
@@ -59,7 +40,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
     stopMacOSAudioCapture();
-    closeLogger();
 });
 
 app.on('activate', () => {
@@ -138,40 +118,21 @@ function setupStorageIpcHandlers() {
         }
     });
 
-    ipcMain.handle('storage:get-openai-credentials', async () => {
+    ipcMain.handle('storage:get-groq-api-key', async () => {
         try {
-            return { success: true, data: storage.getOpenAICredentials() };
+            return { success: true, data: storage.getGroqApiKey() };
         } catch (error) {
-            console.error('Error getting OpenAI credentials:', error);
+            console.error('Error getting Groq API key:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('storage:set-openai-credentials', async (event, config) => {
+    ipcMain.handle('storage:set-groq-api-key', async (event, groqApiKey) => {
         try {
-            storage.setOpenAICredentials(config);
+            storage.setGroqApiKey(groqApiKey);
             return { success: true };
         } catch (error) {
-            console.error('Error setting OpenAI credentials:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('storage:get-openai-sdk-credentials', async () => {
-        try {
-            return { success: true, data: storage.getOpenAISDKCredentials() };
-        } catch (error) {
-            console.error('Error getting OpenAI SDK credentials:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('storage:set-openai-sdk-credentials', async (event, config) => {
-        try {
-            storage.setOpenAISDKCredentials(config);
-            return { success: true };
-        } catch (error) {
-            console.error('Error setting OpenAI SDK credentials:', error);
+            console.error('Error setting Groq API key:', error);
             return { success: false, error: error.message };
         }
     });
@@ -295,43 +256,11 @@ function setupStorageIpcHandlers() {
             return { success: false, error: error.message };
         }
     });
-
-    // ============ MIGRATION ============
-    ipcMain.handle('storage:has-old-config', async () => {
-        try {
-            return { success: true, data: storage.hasOldConfig() };
-        } catch (error) {
-            console.error('Error checking old config:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('storage:migrate-from-old-config', async () => {
-        try {
-            const success = storage.migrateFromOldConfig();
-            return { success: true, data: success };
-        } catch (error) {
-            console.error('Error migrating from old config:', error);
-            return { success: false, error: error.message };
-        }
-    });
 }
 
 function setupGeneralIpcHandlers() {
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
-    });
-
-    ipcMain.handle('open-logs-folder', async () => {
-        try {
-            const logPath = getLogPath();
-            const logsDir = require('path').dirname(logPath);
-            await shell.openPath(logsDir);
-            return { success: true, path: logsDir };
-        } catch (error) {
-            console.error('Error opening logs folder:', error);
-            return { success: false, error: error.message };
-        }
     });
 
     ipcMain.handle('quit-application', async event => {

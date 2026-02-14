@@ -8,21 +8,12 @@ const CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal',
+    layout: 'normal'
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    // OpenAI Realtime API settings
-    openaiApiKey: '',
-    openaiBaseUrl: '',
-    openaiModel: 'gpt-4o-realtime-preview-2024-12-17',
-    // OpenAI SDK settings (for BotHub and other providers)
-    openaiSdkApiKey: '',
-    openaiSdkBaseUrl: '',
-    openaiSdkModel: 'gpt-4o',
-    openaiSdkVisionModel: 'gpt-4o',
-    openaiSdkWhisperModel: 'whisper-1',
+    groqApiKey: ''
 };
 
 const DEFAULT_PREFERENCES = {
@@ -33,37 +24,22 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
-    audioInputMode: 'auto',
     fontSize: 'medium',
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
-    aiProvider: 'gemini',
+    ollamaHost: 'http://127.0.0.1:11434',
+    ollamaModel: 'llama3.1',
+    whisperModel: 'Xenova/whisper-small',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
+    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-3-27b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
 function getConfigDir() {
-    const platform = os.platform();
-    let configDir;
-
-    if (platform === 'win32') {
-        configDir = path.join(os.homedir(), 'AppData', 'Roaming', 'mastermind-config');
-    } else if (platform === 'darwin') {
-        configDir = path.join(os.homedir(), 'Library', 'Application Support', 'mastermind-config');
-    } else {
-        configDir = path.join(os.homedir(), '.config', 'mastermind-config');
-    }
-
-    return configDir;
-}
-
-// Get the old config directory path for migration
-function getOldConfigDir() {
     const platform = os.platform();
     let configDir;
 
@@ -76,43 +52,6 @@ function getOldConfigDir() {
     }
 
     return configDir;
-}
-
-// Check if old config directory exists
-function hasOldConfig() {
-    const oldDir = getOldConfigDir();
-    return fs.existsSync(oldDir);
-}
-
-// Migrate config from old directory to new directory if needed
-function migrateFromOldConfig() {
-    const oldDir = getOldConfigDir();
-    const newDir = getConfigDir();
-
-    if (!fs.existsSync(oldDir)) {
-        console.log('No old config found to migrate');
-        return false;
-    }
-
-    if (fs.existsSync(newDir)) {
-        // NOTE: Does not matter if the new config directory already exists, we will overwrite it with the old config
-        fs.rmSync(newDir, { recursive: true, force: true });
-        console.log('New config directory already exists, overwriting with old config');
-    }
-
-    console.log(`Migrating config from ${oldDir} to ${newDir}...`);
-    try {
-        const parentDir = path.dirname(newDir);
-        if (!fs.existsSync(parentDir)) {
-            fs.mkdirSync(parentDir, { recursive: true });
-        }
-        fs.renameSync(oldDir, newDir);
-        console.log('Migration successful');
-        return true;
-    } catch (error) {
-        console.error('Migration failed:', error.message);
-        return false;
-    }
 }
 
 // File paths
@@ -257,42 +196,12 @@ function setApiKey(apiKey) {
     return setCredentials({ apiKey });
 }
 
-function getOpenAICredentials() {
-    const creds = getCredentials();
-    return {
-        apiKey: creds.openaiApiKey || '',
-        baseUrl: creds.openaiBaseUrl || '',
-        model: creds.openaiModel || 'gpt-4o-realtime-preview-2024-12-17',
-    };
+function getGroqApiKey() {
+    return getCredentials().groqApiKey || '';
 }
 
-function setOpenAICredentials(config) {
-    const updates = {};
-    if (config.apiKey !== undefined) updates.openaiApiKey = config.apiKey;
-    if (config.baseUrl !== undefined) updates.openaiBaseUrl = config.baseUrl;
-    if (config.model !== undefined) updates.openaiModel = config.model;
-    return setCredentials(updates);
-}
-
-function getOpenAISDKCredentials() {
-    const creds = getCredentials();
-    return {
-        apiKey: creds.openaiSdkApiKey || '',
-        baseUrl: creds.openaiSdkBaseUrl || '',
-        model: creds.openaiSdkModel || 'gpt-4o',
-        visionModel: creds.openaiSdkVisionModel || 'gpt-4o',
-        whisperModel: creds.openaiSdkWhisperModel || 'whisper-1',
-    };
-}
-
-function setOpenAISDKCredentials(config) {
-    const updates = {};
-    if (config.apiKey !== undefined) updates.openaiSdkApiKey = config.apiKey;
-    if (config.baseUrl !== undefined) updates.openaiSdkBaseUrl = config.baseUrl;
-    if (config.model !== undefined) updates.openaiSdkModel = config.model;
-    if (config.visionModel !== undefined) updates.openaiSdkVisionModel = config.visionModel;
-    if (config.whisperModel !== undefined) updates.openaiSdkWhisperModel = config.whisperModel;
-    return setCredentials(updates);
+function setGroqApiKey(groqApiKey) {
+    return setCredentials({ groqApiKey });
 }
 
 // ============ PREFERENCES ============
@@ -347,6 +256,21 @@ function getTodayLimits() {
     const todayEntry = limits.data.find(entry => entry.date === today);
 
     if (todayEntry) {
+        // ensure new fields exist
+        if(!todayEntry.groq) {
+            todayEntry.groq = {
+                'qwen3-32b': { chars: 0, limit: 1500000 },
+                'gpt-oss-120b': { chars: 0, limit: 600000 },
+                'gpt-oss-20b': { chars: 0, limit: 600000 },
+                'kimi-k2-instruct': { chars: 0, limit: 600000 }
+            };
+        }
+        if(!todayEntry.gemini) {
+            todayEntry.gemini = {
+                'gemma-3-27b-it': { chars: 0 }
+            };
+        }
+        setLimits(limits);
         return todayEntry;
     }
 
@@ -356,6 +280,15 @@ function getTodayLimits() {
         date: today,
         flash: { count: 0 },
         flashLite: { count: 0 },
+        groq: {
+            'qwen3-32b': { chars: 0, limit: 1500000 },
+            'gpt-oss-120b': { chars: 0, limit: 600000 },
+            'gpt-oss-20b': { chars: 0, limit: 600000 },
+            'kimi-k2-instruct': { chars: 0, limit: 600000 }
+        },
+        gemini: {
+            'gemma-3-27b-it': { chars: 0 }
+        }
     };
     limits.data.push(newEntry);
     setLimits(limits);
@@ -376,7 +309,7 @@ function incrementLimitCount(model) {
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 },
+            flashLite: { count: 0 }
         };
         limits.data.push(todayEntry);
     } else {
@@ -395,6 +328,21 @@ function incrementLimitCount(model) {
     return todayEntry;
 }
 
+function incrementCharUsage(provider, model, charCount) {
+    getTodayLimits();
+
+    const limits = getLimits();
+    const today = getTodayDateString();
+    const todayEntry = limits.data.find(entry => entry.date === today);
+
+    if(todayEntry[provider] && todayEntry[provider][model]) {
+        todayEntry[provider][model].chars += charCount;
+        setLimits(limits);
+    }
+
+    return todayEntry;
+}
+
 function getAvailableModel() {
     const todayLimits = getTodayLimits();
 
@@ -407,6 +355,27 @@ function getAvailableModel() {
     }
 
     return 'gemini-2.5-flash'; // Default to flash for paid API users
+}
+
+function getModelForToday() {
+    const todayEntry = getTodayLimits();
+    const groq = todayEntry.groq;
+
+    if (groq['qwen3-32b'].chars < groq['qwen3-32b'].limit) {
+        return 'qwen/qwen3-32b';
+    }
+    if (groq['gpt-oss-120b'].chars < groq['gpt-oss-120b'].limit) {
+        return 'openai/gpt-oss-120b';
+    }
+    if (groq['gpt-oss-20b'].chars < groq['gpt-oss-20b'].limit) {
+        return 'openai/gpt-oss-20b';
+    }
+    if (groq['kimi-k2-instruct'].chars < groq['kimi-k2-instruct'].limit) {
+        return 'moonshotai/kimi-k2-instruct';
+    }
+
+    // All limits exhausted
+    return null;
 }
 
 // ============ HISTORY ============
@@ -430,7 +399,7 @@ function saveSession(sessionId, data) {
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -447,8 +416,7 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs
-            .readdirSync(historyDir)
+        const files = fs.readdirSync(historyDir)
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => {
                 // Sort by timestamp descending (newest first)
@@ -457,24 +425,22 @@ function getAllSessions() {
                 return tsB - tsA;
             });
 
-        return files
-            .map(file => {
-                const sessionId = file.replace('.json', '');
-                const data = readJsonFile(path.join(historyDir, file), null);
-                if (data) {
-                    return {
-                        sessionId,
-                        createdAt: data.createdAt,
-                        lastUpdated: data.lastUpdated,
-                        messageCount: data.conversationHistory?.length || 0,
-                        screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
-                        profile: data.profile || null,
-                        customPrompt: data.customPrompt || null,
-                    };
-                }
-                return null;
-            })
-            .filter(Boolean);
+        return files.map(file => {
+            const sessionId = file.replace('.json', '');
+            const data = readJsonFile(path.join(historyDir, file), null);
+            if (data) {
+                return {
+                    sessionId,
+                    createdAt: data.createdAt,
+                    lastUpdated: data.lastUpdated,
+                    messageCount: data.conversationHistory?.length || 0,
+                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                    profile: data.profile || null,
+                    customPrompt: data.customPrompt || null
+                };
+            }
+            return null;
+        }).filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -522,10 +488,6 @@ module.exports = {
     initializeStorage,
     getConfigDir,
 
-    // Migration
-    hasOldConfig,
-    migrateFromOldConfig,
-
     // Config
     getConfig,
     setConfig,
@@ -536,10 +498,8 @@ module.exports = {
     setCredentials,
     getApiKey,
     setApiKey,
-    getOpenAICredentials,
-    setOpenAICredentials,
-    getOpenAISDKCredentials,
-    setOpenAISDKCredentials,
+    getGroqApiKey,
+    setGroqApiKey,
 
     // Preferences
     getPreferences,
@@ -556,6 +516,8 @@ module.exports = {
     getTodayLimits,
     incrementLimitCount,
     getAvailableModel,
+    incrementCharUsage,
+    getModelForToday,
 
     // History
     saveSession,
@@ -565,5 +527,5 @@ module.exports = {
     deleteAllSessions,
 
     // Clear all
-    clearAllData,
+    clearAllData
 };

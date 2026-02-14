@@ -10,16 +10,16 @@ packaging.
 Install dependencies and run the development app:
 
 ```
-1. pnpm install
-2. pnpm start
+1. npm install
+2. npm start
 ```
 
 ## Style
 
-Run `pnpm prettier --write .` before committing. Prettier uses the settings in
+Run `npx prettier --write .` before committing. Prettier uses the settings in
 `.prettierrc` (four-space indentation, print width 150, semicolons and single
 quotes). `src/assets` and `node_modules` are ignored via `.prettierignore`.
-The project does not provide linting; `pnpm run lint` simply prints
+The project does not provide linting; `npm run lint` simply prints
 "No linting configured".
 
 ## Code standards
