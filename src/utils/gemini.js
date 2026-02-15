@@ -732,7 +732,9 @@ async function initializeGeminiSession(
         inputAudioTranscription: {},
         tools: enabledTools,
         contextWindowCompression: { slidingWindow: {} },
-        speechConfig: { languageCode: language },
+        ...(language && language !== "auto"
+          ? { speechConfig: { languageCode: language } }
+          : {}),
         systemInstruction: {
           parts: [{ text: systemPrompt }],
         },

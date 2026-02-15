@@ -262,6 +262,7 @@ export class CustomizeView extends LitElement {
 
   getLanguages() {
     return [
+      { value: "auto", name: "Auto (Multilingual)" },
       { value: "en-US", name: "English (US)" },
       { value: "en-GB", name: "English (UK)" },
       { value: "en-AU", name: "English (Australia)" },
@@ -727,7 +728,10 @@ export class CustomizeView extends LitElement {
             >
               ${this.getLanguages().map(
                 (language) =>
-                  html`<option value=${language.value}>
+                  html`<option
+                    value=${language.value}
+                    ?selected=${language.value === this.selectedLanguage}
+                  >
                     ${language.name}
                   </option>`,
               )}
