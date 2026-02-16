@@ -155,6 +155,40 @@ async function loadModel(modelName, cacheDir, device = "cpu") {
           {
             dtype: "q8",
             device: dev,
+            progress_callback: (progress) => {
+              // progress: { status, name?, file?, progress?, loaded?, total? }
+              if (
+                progress.status === "download" ||
+                progress.status === "progress"
+              ) {
+                send({
+                  type: "progress",
+                  file: progress.file || progress.name || "",
+                  progress: progress.progress ?? 0,
+                  loaded: progress.loaded ?? 0,
+                  total: progress.total ?? 0,
+                  status: progress.status,
+                });
+              } else if (progress.status === "done") {
+                send({
+                  type: "progress",
+                  file: progress.file || progress.name || "",
+                  progress: 100,
+                  loaded: progress.total ?? 0,
+                  total: progress.total ?? 0,
+                  status: "done",
+                });
+              } else if (progress.status === "initiate") {
+                send({
+                  type: "progress",
+                  file: progress.file || progress.name || "",
+                  progress: 0,
+                  loaded: 0,
+                  total: 0,
+                  status: "initiate",
+                });
+              }
+            },
           },
         );
 

@@ -382,6 +382,7 @@ export class CheatingDaddyApp extends LitElement {
     _storageLoaded: { state: true },
     _updateAvailable: { state: true },
     _whisperDownloading: { state: true },
+    _whisperProgress: { state: true },
   };
 
   constructor() {
@@ -407,6 +408,7 @@ export class CheatingDaddyApp extends LitElement {
     this._timerInterval = null;
     this._updateAvailable = false;
     this._whisperDownloading = false;
+    this._whisperProgress = null;
     this._localVersion = "";
 
     this._loadFromStorage();
@@ -485,6 +487,10 @@ export class CheatingDaddyApp extends LitElement {
       );
       ipcRenderer.on("whisper-downloading", (_, downloading) => {
         this._whisperDownloading = downloading;
+        if (!downloading) this._whisperProgress = null;
+      });
+      ipcRenderer.on("whisper-progress", (_, progress) => {
+        this._whisperProgress = progress;
       });
     }
   }
@@ -500,6 +506,7 @@ export class CheatingDaddyApp extends LitElement {
       ipcRenderer.removeAllListeners("click-through-toggled");
       ipcRenderer.removeAllListeners("reconnect-failed");
       ipcRenderer.removeAllListeners("whisper-downloading");
+      ipcRenderer.removeAllListeners("whisper-progress");
     }
   }
 
@@ -778,6 +785,7 @@ export class CheatingDaddyApp extends LitElement {
             .onStart=${() => this.handleStart()}
             .onExternalLink=${(url) => this.handleExternalLinkClick(url)}
             .whisperDownloading=${this._whisperDownloading}
+            .whisperProgress=${this._whisperProgress}
           ></main-view>
         `;
 

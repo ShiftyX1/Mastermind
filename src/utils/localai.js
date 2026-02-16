@@ -263,6 +263,15 @@ function spawnWhisperWorker() {
       case "status":
         sendToRenderer("update-status", msg.message);
         break;
+      case "progress":
+        sendToRenderer("whisper-progress", {
+          file: msg.file,
+          progress: msg.progress,
+          loaded: msg.loaded,
+          total: msg.total,
+          status: msg.status,
+        });
+        break;
     }
   });
 

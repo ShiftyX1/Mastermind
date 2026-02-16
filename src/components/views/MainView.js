@@ -151,6 +151,63 @@ export class MainView extends LitElement {
       }
     }
 
+    /* ── Whisper download progress ── */
+
+    .whisper-progress-container {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
+      border-radius: var(--radius-sm, 6px);
+      border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+    }
+
+    .whisper-progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: var(--text-secondary, #999);
+    }
+
+    .whisper-progress-file {
+      font-family: var(--font-mono, monospace);
+      font-size: 10px;
+      color: var(--text-secondary, #999);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 200px;
+    }
+
+    .whisper-progress-pct {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--accent, #6cb4ee);
+    }
+
+    .whisper-progress-track {
+      height: 4px;
+      background: var(--border, rgba(255, 255, 255, 0.1));
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .whisper-progress-bar {
+      height: 100%;
+      background: var(--accent, #6cb4ee);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      min-width: 0;
+    }
+
+    .whisper-progress-size {
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--text-tertiary, #666);
+      text-align: right;
+    }
+
     /* ── Start button ── */
 
     .start-button {
@@ -422,6 +479,7 @@ export class MainView extends LitElement {
     onProfileChange: { type: Function },
     isInitializing: { type: Boolean },
     whisperDownloading: { type: Boolean },
+    whisperProgress: { type: Object },
     // Internal state
     _mode: { state: true },
     _token: { state: true },
@@ -453,6 +511,7 @@ export class MainView extends LitElement {
     this.onProfileChange = () => {};
     this.isInitializing = false;
     this.whisperDownloading = false;
+    this.whisperProgress = null;
 
     this._mode = "byok";
     this._token = "";
@@ -893,6 +952,40 @@ export class MainView extends LitElement {
     this.requestUpdate();
   }
 
+  _formatBytes(bytes) {
+    if (!bytes || bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0) + " " + units[i];
+  }
+
+  _renderWhisperProgress() {
+    const p = this.whisperProgress;
+    if (!p) return "";
+
+    const pct = Math.round(p.progress || 0);
+    const fileName = p.file ? p.file.split("/").pop() : "";
+
+    return html`
+      <div class="whisper-progress-container">
+        <div class="whisper-progress-header">
+          <span class="whisper-progress-file" title=${p.file || ""}
+            >${fileName || "Preparing..."}</span
+          >
+          <span class="whisper-progress-pct">${pct}%</span>
+        </div>
+        <div class="whisper-progress-track">
+          <div class="whisper-progress-bar" style="width: ${pct}%"></div>
+        </div>
+        ${p.total
+          ? html`<div class="whisper-progress-size">
+              ${this._formatBytes(p.loaded)} / ${this._formatBytes(p.total)}
+            </div>`
+          : ""}
+      </div>
+    `;
+  }
+
   _handleProfileChange(e) {
     this.onProfileChange(e.target.value);
   }
@@ -1261,6 +1354,9 @@ export class MainView extends LitElement {
                   : "Downloaded automatically on first use"}
               </div>
             `}
+        ${this.whisperDownloading && this.whisperProgress
+          ? this._renderWhisperProgress()
+          : ""}
       </div>
 
       ${this._renderStartButton()}
