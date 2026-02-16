@@ -1,7 +1,7 @@
 {
   "name": "mastermind",
   "productName": "Mastermind",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Mastermind AI assistant",
   "main": "src/index.js",
   "scripts": {
