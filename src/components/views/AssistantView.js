@@ -140,7 +140,8 @@ export class AssistantView extends LitElement {
       color: var(--text-primary);
     }
 
-    /* ── Syntax highlighting for code blocks (GitHub Dark theme) ── */
+    /* ── Syntax highlighting for code blocks ── */
+    /* Default (Dark theme) */
     .response-container .hljs {
       color: #c9d1d9;
       background: transparent;
@@ -231,6 +232,98 @@ export class AssistantView extends LitElement {
     .response-container .hljs-deletion {
       color: #ffdcd7;
       background-color: #67060c;
+    }
+
+    /* Light theme syntax highlighting */
+    :host-context(body[data-theme-type="light"]) .response-container .hljs {
+      color: #24292f;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-doctag,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-keyword,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-meta .hljs-keyword,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-template-tag,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-template-variable,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-type,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-variable.language_ {
+      color: #cf222e;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title.class_,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title.class_.inherited__,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title.function_ {
+      color: #8250df;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-attr,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-attribute,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-literal,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-meta,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-number,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-operator,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-attr,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-class,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-id,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-variable {
+      color: #0550ae;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-meta .hljs-string,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-regexp,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-string {
+      color: #0a3069;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-built_in,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-symbol {
+      color: #953800;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-code,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-comment,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-formula {
+      color: #6e7781;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-name,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-quote,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-pseudo,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-tag {
+      color: #116329;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-subst {
+      color: #24292f;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-section {
+      color: #0969da;
+      font-weight: 700;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-bullet {
+      color: #953800;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-emphasis {
+      color: #24292f;
+      font-style: italic;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-strong {
+      color: #24292f;
+      font-weight: 700;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-addition {
+      color: #116329;
+      background-color: #dafbe1;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-deletion {
+      color: #82071e;
+      background-color: #ffebe9;
     }
 
     .response-container a {

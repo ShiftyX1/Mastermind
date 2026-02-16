@@ -1087,6 +1087,11 @@ const theme = {
     this.current = themeName;
     const root = document.documentElement;
 
+    // Determine if theme is light or dark
+    const lightThemes = ["light", "sepia"];
+    const isLightTheme = lightThemes.includes(themeName);
+    document.body.setAttribute("data-theme-type", isLightTheme ? "light" : "dark");
+
     // New design tokens (used by components)
     root.style.setProperty("--text-primary", colors.text);
     root.style.setProperty("--text-secondary", colors.textSecondary);
