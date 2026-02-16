@@ -110,11 +110,220 @@ export class AssistantView extends LitElement {
       padding: var(--space-md);
       overflow-x: auto;
       margin: 0.8em 0;
+      position: relative;
+    }
+
+    .response-container pre::before {
+      content: attr(data-language);
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      padding: 4px 12px;
+      font-size: var(--font-size-xs);
+      font-family: var(--font-mono);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-right: none;
+      border-bottom-left-radius: var(--radius-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .response-container pre code {
       background: none;
       padding: 0;
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    /* ── Syntax highlighting for code blocks ── */
+    /* Default (Dark theme) */
+    .response-container .hljs {
+      color: #c9d1d9;
+      background: transparent;
+    }
+
+    .response-container .hljs-doctag,
+    .response-container .hljs-keyword,
+    .response-container .hljs-meta .hljs-keyword,
+    .response-container .hljs-template-tag,
+    .response-container .hljs-template-variable,
+    .response-container .hljs-type,
+    .response-container .hljs-variable.language_ {
+      color: #ff7b72;
+    }
+
+    .response-container .hljs-title,
+    .response-container .hljs-title.class_,
+    .response-container .hljs-title.class_.inherited__,
+    .response-container .hljs-title.function_ {
+      color: #d2a8ff;
+    }
+
+    .response-container .hljs-attr,
+    .response-container .hljs-attribute,
+    .response-container .hljs-literal,
+    .response-container .hljs-meta,
+    .response-container .hljs-number,
+    .response-container .hljs-operator,
+    .response-container .hljs-selector-attr,
+    .response-container .hljs-selector-class,
+    .response-container .hljs-selector-id,
+    .response-container .hljs-variable {
+      color: #79c0ff;
+    }
+
+    .response-container .hljs-meta .hljs-string,
+    .response-container .hljs-regexp,
+    .response-container .hljs-string {
+      color: #a5d6ff;
+    }
+
+    .response-container .hljs-built_in,
+    .response-container .hljs-symbol {
+      color: #ffa657;
+    }
+
+    .response-container .hljs-code,
+    .response-container .hljs-comment,
+    .response-container .hljs-formula {
+      color: #8b949e;
+    }
+
+    .response-container .hljs-name,
+    .response-container .hljs-quote,
+    .response-container .hljs-selector-pseudo,
+    .response-container .hljs-selector-tag {
+      color: #7ee787;
+    }
+
+    .response-container .hljs-subst {
+      color: #c9d1d9;
+    }
+
+    .response-container .hljs-section {
+      color: #1f6feb;
+      font-weight: 700;
+    }
+
+    .response-container .hljs-bullet {
+      color: #f2cc60;
+    }
+
+    .response-container .hljs-emphasis {
+      color: #c9d1d9;
+      font-style: italic;
+    }
+
+    .response-container .hljs-strong {
+      color: #c9d1d9;
+      font-weight: 700;
+    }
+
+    .response-container .hljs-addition {
+      color: #aff5b4;
+      background-color: #033a16;
+    }
+
+    .response-container .hljs-deletion {
+      color: #ffdcd7;
+      background-color: #67060c;
+    }
+
+    /* Light theme syntax highlighting */
+    :host-context(body[data-theme-type="light"]) .response-container .hljs {
+      color: #24292f;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-doctag,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-keyword,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-meta .hljs-keyword,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-template-tag,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-template-variable,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-type,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-variable.language_ {
+      color: #cf222e;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title.class_,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title.class_.inherited__,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-title.function_ {
+      color: #8250df;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-attr,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-attribute,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-literal,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-meta,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-number,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-operator,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-attr,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-class,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-id,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-variable {
+      color: #0550ae;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-meta .hljs-string,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-regexp,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-string {
+      color: #0a3069;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-built_in,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-symbol {
+      color: #953800;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-code,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-comment,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-formula {
+      color: #6e7781;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-name,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-quote,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-pseudo,
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-selector-tag {
+      color: #116329;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-subst {
+      color: #24292f;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-section {
+      color: #0969da;
+      font-weight: 700;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-bullet {
+      color: #953800;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-emphasis {
+      color: #24292f;
+      font-style: italic;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-strong {
+      color: #24292f;
+      font-weight: 700;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-addition {
+      color: #116329;
+      background-color: #dafbe1;
+    }
+
+    :host-context(body[data-theme-type="light"]) .response-container .hljs-deletion {
+      color: #82071e;
+      background-color: #ffebe9;
     }
 
     .response-container a {
@@ -402,10 +611,33 @@ export class AssistantView extends LitElement {
   renderMarkdown(content) {
     if (typeof window !== "undefined" && window.marked) {
       try {
+        // Configure marked to use highlight.js for syntax highlighting
         window.marked.setOptions({
           breaks: true,
           gfm: true,
           sanitize: false,
+          highlight: (code, lang) => {
+            if (window.hljs && lang) {
+              try {
+                return window.hljs.highlight(code, { language: lang }).value;
+              } catch (e) {
+                // If language is not recognized, try auto-detection
+                try {
+                  return window.hljs.highlightAuto(code).value;
+                } catch (err) {
+                  return window.hljs.escapeHtml(code);
+                }
+              }
+            } else if (window.hljs) {
+              // Auto-detect language if not specified
+              try {
+                return window.hljs.highlightAuto(code).value;
+              } catch (e) {
+                return window.hljs.escapeHtml(code);
+              }
+            }
+            return code;
+          },
         });
         let rendered = window.marked.parse(content);
         rendered = this.wrapWordsInSpans(rendered);
@@ -421,7 +653,7 @@ export class AssistantView extends LitElement {
   wrapWordsInSpans(html) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    const tagsToSkip = ["PRE"];
+    const tagsToSkip = ["PRE", "CODE"];
 
     function wrap(node) {
       if (
@@ -451,6 +683,49 @@ export class AssistantView extends LitElement {
     }
     Array.from(doc.body.childNodes).forEach(wrap);
     return doc.body.innerHTML;
+  }
+
+  applyCodeHighlighting(container) {
+    if (!window.hljs) return;
+    
+    // Find all code blocks in the rendered content
+    const codeBlocks = container.querySelectorAll("pre code");
+    
+    codeBlocks.forEach((block) => {
+      const pre = block.parentElement;
+      if (!pre || pre.tagName !== "PRE") return;
+      
+      // Skip if already highlighted
+      if (block.classList.contains("hljs")) {
+        return;
+      }
+      
+      const code = block.textContent;
+      let lang = block.className.replace(/language-|lang-/, "") || "";
+      
+      try {
+        if (lang && window.hljs.getLanguage(lang)) {
+          block.innerHTML = window.hljs.highlight(code, { language: lang }).value;
+        } else {
+          // Auto-detect language
+          const result = window.hljs.highlightAuto(code);
+          block.innerHTML = result.value;
+          if (result.language && !lang) {
+            lang = result.language;
+            block.className = `language-${lang}`;
+          }
+        }
+        block.classList.add("hljs");
+        
+        // Set data-language attribute on pre tag for display
+        if (lang) {
+          pre.setAttribute("data-language", lang);
+        }
+      } catch (e) {
+        console.warn("Error highlighting code block:", e);
+        // Leave block as-is if highlighting fails
+      }
+    });
   }
 
   navigateToPreviousResponse() {
@@ -775,6 +1050,10 @@ export class AssistantView extends LitElement {
       const currentResponse = this.getCurrentResponse();
       const renderedResponse = this.renderMarkdown(currentResponse);
       container.innerHTML = renderedResponse;
+      
+      // Apply syntax highlighting to code blocks
+      this.applyCodeHighlighting(container);
+      
       if (this.shouldAnimateResponse) {
         this.dispatchEvent(
           new CustomEvent("response-animation-complete", {
