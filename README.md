@@ -9,8 +9,8 @@
   
   [![Release](https://img.shields.io/github/actions/workflow/status/ShiftyX1/Mastermind/release.yml?label=release)](https://github.com/ShiftyX1/Mastermind/actions/workflows/release.yml)
   [![License](https://img.shields.io/badge/license-GPL3.0-blue.svg)](LICENSE)
-  [![Latest Version](https://img.shields.io/github/v/release/ShiftyX1/Mastermind?include_prereleases&label=latest)](https://github.com/ShiftyX1/Mastermind/releases)
-  [![Stable Version](https://img.shields.io/github/v/release/ShiftyX1/Mastermind?label=stable)](https://github.com/ShiftyX1/Mastermind/releases)
+  [![Latest Version](https://img.shields.io/github/v/release/ShiftyX1/Mastermind?include_prereleases&label=latest&color=FFFF00)](https://github.com/ShiftyX1/Mastermind/releases)
+  [![Stable Version](https://img.shields.io/github/v/release/ShiftyX1/Mastermind?color=6666FF)](https://github.com/ShiftyX1/Mastermind/releases)
   [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)](#requirements)
   
 </div>
