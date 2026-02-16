@@ -7,6 +7,7 @@ const {
 } = require("./gemini");
 const { fork } = require("child_process");
 const path = require("path");
+const { getSystemNode } = require("./nodeDetect");
 
 // ── State ──
 
@@ -18,6 +19,9 @@ let whisperReady = false;
 let localConversationHistory = [];
 let currentSystemPrompt = null;
 let isLocalActive = false;
+
+// Set when we intentionally kill the worker to suppress crash handling
+let whisperShuttingDown = false;
 
 // Pending transcription callback (one at a time)
 let pendingTranscribe = null;
@@ -189,12 +193,54 @@ function spawnWhisperWorker() {
   const workerPath = path.join(__dirname, "whisperWorker.js");
   console.log("[LocalAI] Spawning Whisper worker:", workerPath);
 
-  whisperWorker = fork(workerPath, [], {
-    stdio: ["pipe", "pipe", "pipe", "ipc"],
-    // ELECTRON_RUN_AS_NODE makes the Electron binary behave as plain Node.js,
-    // which is required for child_process.fork() in packaged Electron apps.
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-  });
+  // Determine the best way to spawn the worker:
+  //   1. System Node.js (preferred) — native addons were compiled against this
+  //      ABI, so onnxruntime-node works without SIGTRAP / ABI mismatches.
+  //   2. Electron utilityProcess (packaged builds) — proper Node.js child
+  //      process API that doesn't require the RunAsNode fuse.
+  //   3. ELECTRON_RUN_AS_NODE (last resort, dev only) — the old approach that
+  //      only works when the RunAsNode fuse isn't flipped.
+
+  const systemNode = getSystemNode();
+
+  if (systemNode) {
+    // Spawn with system Node.js — onnxruntime-node native binary matches ABI
+    console.log("[LocalAI] Using system Node.js:", systemNode.nodePath);
+    whisperWorker = fork(workerPath, [], {
+      stdio: ["pipe", "pipe", "pipe", "ipc"],
+      execPath: systemNode.nodePath,
+      env: {
+        ...process.env,
+        // Unset ELECTRON_RUN_AS_NODE so the system node doesn't inherit it
+        ELECTRON_RUN_AS_NODE: undefined,
+      },
+    });
+  } else {
+    // No system Node.js found — try utilityProcess (Electron >= 22)
+    // utilityProcess.fork() creates a proper child Node.js process without
+    // needing the RunAsNode fuse.  Falls back to ELECTRON_RUN_AS_NODE for
+    // dev mode where fuses aren't applied.
+    try {
+      const { utilityProcess: UP } = require("electron");
+      if (UP && typeof UP.fork === "function") {
+        console.log("[LocalAI] Using Electron utilityProcess");
+        const up = UP.fork(workerPath);
+        // Wrap utilityProcess to look like a ChildProcess for the rest of localai.js
+        whisperWorker = wrapUtilityProcess(up);
+        return;
+      }
+    } catch (_) {
+      // utilityProcess not available (older Electron or renderer context)
+    }
+
+    console.warn(
+      "[LocalAI] No system Node.js — falling back to ELECTRON_RUN_AS_NODE (WASM backend will be used)",
+    );
+    whisperWorker = fork(workerPath, [], {
+      stdio: ["pipe", "pipe", "pipe", "ipc"],
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    });
+  }
 
   whisperWorker.stdout.on("data", (data) => {
     console.log("[WhisperWorker stdout]", data.toString().trim());
@@ -230,6 +276,12 @@ function spawnWhisperWorker() {
     whisperWorker = null;
     whisperReady = false;
 
+    // If we intentionally shut down, don't treat as crash
+    if (whisperShuttingDown) {
+      whisperShuttingDown = false;
+      return;
+    }
+
     // Reject any pending transcription
     if (pendingTranscribe) {
       pendingTranscribe.reject(
@@ -263,11 +315,52 @@ function spawnWhisperWorker() {
   });
 }
 
+/**
+ * Wrap Electron's utilityProcess to behave like a ChildProcess (duck-typing)
+ * so the rest of localai.js can use the same API.
+ */
+function wrapUtilityProcess(up) {
+  const EventEmitter = require("events");
+  const wrapper = new EventEmitter();
+
+  // Forward messages
+  up.on("message", (msg) => wrapper.emit("message", msg));
+
+  // Map utilityProcess exit to ChildProcess-like exit event
+  up.on("exit", (code) => wrapper.emit("exit", code, null));
+
+  // Provide stdout/stderr stubs (utilityProcess pipes to parent console)
+  const { Readable } = require("stream");
+  wrapper.stdout = new Readable({ read() {} });
+  wrapper.stderr = new Readable({ read() {} });
+
+  wrapper.send = (data) => up.postMessage(data);
+  wrapper.kill = (signal) => up.kill();
+  wrapper.removeAllListeners = () => {
+    up.removeAllListeners();
+    EventEmitter.prototype.removeAllListeners.call(wrapper);
+  };
+
+  // Setup stdout/stderr forwarding
+  wrapper.stdout.on("data", (data) => {
+    console.log("[WhisperWorker stdout]", data.toString().trim());
+  });
+  wrapper.stderr.on("data", (data) => {
+    console.error("[WhisperWorker stderr]", data.toString().trim());
+  });
+
+  return wrapper;
+}
+
 let pendingLoad = null;
 
 function handleWorkerLoadResult(msg) {
   if (msg.success) {
-    console.log("[LocalAI] Whisper model loaded successfully (in worker)");
+    console.log(
+      "[LocalAI] Whisper model loaded successfully (in worker, device:",
+      msg.device || "unknown",
+      ")",
+    );
     whisperReady = true;
     sendToRenderer("whisper-downloading", false);
     isWhisperLoading = false;
@@ -312,11 +405,49 @@ function respawnWhisperWorker() {
     "Xenova/whisper-small";
   sendToRenderer("whisper-downloading", true);
   isWhisperLoading = true;
-  whisperWorker.send({ type: "load", modelName, cacheDir });
+  const device = resolveWhisperDevice();
+  whisperWorker.send({ type: "load", modelName, cacheDir, device });
+}
+
+/**
+ * Determine which ONNX backend to use for Whisper inference.
+ * - "cpu"  → onnxruntime-node (fast, native — requires matching ABI)
+ * - "wasm" → onnxruntime-web  (slower but universally compatible)
+ *
+ * When spawned with system Node.js, native CPU backend is safe.
+ * Otherwise default to WASM to prevent native crashes.
+ */
+function resolveWhisperDevice() {
+  const prefs = require("../storage").getPreferences();
+  if (prefs.whisperDevice) return prefs.whisperDevice;
+  // Auto-detect: if we're running with system Node.js, native is safe
+  const systemNode = getSystemNode();
+  return systemNode ? "cpu" : "wasm";
+}
+
+/**
+ * Map the app's BCP-47 language tag (e.g. "en-US", "ru-RU") to the
+ * ISO 639-1 code that Whisper expects (e.g. "en", "ru").
+ * Returns "auto" when the user selected auto-detect, which tells the
+ * worker to let Whisper detect the language itself.
+ */
+function resolveWhisperLanguage() {
+  const prefs = require("../storage").getPreferences();
+  const lang = prefs.selectedLanguage || "en-US";
+  if (lang === "auto") return "auto";
+  // BCP-47: primary subtag is the ISO 639 code
+  // Handle special case: "cmn-CN" → "zh" (Mandarin Chinese → Whisper uses "zh")
+  const primary = lang.split("-")[0].toLowerCase();
+  const WHISPER_LANG_MAP = {
+    cmn: "zh",
+    yue: "zh",
+  };
+  return WHISPER_LANG_MAP[primary] || primary;
 }
 
 function killWhisperWorker() {
   if (whisperWorker) {
+    whisperShuttingDown = true;
     try {
       whisperWorker.removeAllListeners();
       whisperWorker.kill();
@@ -345,9 +476,12 @@ async function loadWhisperPipeline(modelName) {
   const { app } = require("electron");
   const cacheDir = path.join(app.getPath("userData"), "whisper-models");
 
+  const device = resolveWhisperDevice();
+  console.log("[LocalAI] Whisper device:", device);
+
   return new Promise((resolve) => {
     pendingLoad = { resolve };
-    whisperWorker.send({ type: "load", modelName, cacheDir });
+    whisperWorker.send({ type: "load", modelName, cacheDir, device });
   });
 }
 
@@ -393,7 +527,11 @@ async function transcribeAudio(pcm16kBuffer) {
     };
 
     try {
-      whisperWorker.send({ type: "transcribe", audioBase64 });
+      whisperWorker.send({
+        type: "transcribe",
+        audioBase64,
+        language: resolveWhisperLanguage(),
+      });
     } catch (err) {
       clearTimeout(timeout);
       pendingTranscribe = null;
