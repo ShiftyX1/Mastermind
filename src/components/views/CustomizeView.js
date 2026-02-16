@@ -1,1829 +1,882 @@
-import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { resizeLayout } from '../../utils/windowResize.js';
+import { html, css, LitElement } from "../../assets/lit-core-2.7.4.min.js";
+import { unifiedPageStyles } from "./sharedPageStyles.js";
 
 export class CustomizeView extends LitElement {
-    static styles = css`
-        * {
-            font-family:
-                'Inter',
-                -apple-system,
-                BlinkMacSystemFont,
-                sans-serif;
-            cursor: default;
-            user-select: none;
-        }
-
-        :host {
-            display: block;
-            height: 100%;
-        }
-
-        .settings-layout {
-            display: flex;
-            height: 100%;
-        }
-
-        /* Sidebar */
-        .settings-sidebar {
-            width: 160px;
-            min-width: 160px;
-            border-right: 1px solid var(--border-color);
-            padding: 8px 0;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .sidebar-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            margin: 0 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.1s ease;
-            border: none;
-            background: transparent;
-            text-align: left;
-            width: calc(100% - 16px);
-        }
-
-        .sidebar-item:hover {
-            background: var(--hover-background);
-            color: var(--text-color);
-        }
-
-        .sidebar-item.active {
-            background: var(--bg-tertiary);
-            color: var(--text-color);
-        }
-
-        .sidebar-item svg {
-            width: 16px;
-            height: 16px;
-            flex-shrink: 0;
-        }
-
-        .sidebar-item.danger {
-            color: var(--error-color);
-        }
-
-        .sidebar-item.danger:hover,
-        .sidebar-item.danger.active {
-            color: var(--error-color);
-        }
-
-        /* Main content */
-        .settings-content {
-            flex: 1;
-            padding: 16px 0;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .settings-content > * {
-            flex-shrink: 0;
-        }
-
-        .settings-content > .profile-section {
-            flex: 1;
-            min-height: 0;
-        }
-
-        .settings-content::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .settings-content::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .settings-content::-webkit-scrollbar-thumb {
-            background: var(--scrollbar-thumb);
-            border-radius: 4px;
-        }
-
-        .settings-content::-webkit-scrollbar-thumb:hover {
-            background: var(--scrollbar-thumb-hover);
-        }
-
-        .content-header {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 16px;
-            padding: 0 16px 12px 16px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .settings-section {
-            padding: 12px 16px;
-        }
-
-        .section-title {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-        }
-
-        .form-grid {
-            display: grid;
-            gap: 12px;
-            padding: 0 16px;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            align-items: start;
-        }
-
-        @media (max-width: 600px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-
-        .form-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--text-color);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .form-description {
-            font-size: 11px;
-            color: var(--text-muted);
-            line-height: 1.4;
-            margin-top: 2px;
-        }
-
-        .form-control {
-            background: var(--input-background);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 8px 10px;
-            border-radius: 3px;
-            font-size: 12px;
-            transition: border-color 0.1s ease;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--border-default);
-        }
-
-        .form-control:hover:not(:focus) {
-            border-color: var(--border-default);
-        }
-
-        select.form-control {
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b6b6b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 8px center;
-            background-repeat: no-repeat;
-            background-size: 12px;
-            padding-right: 28px;
-        }
-
-        textarea.form-control {
-            resize: vertical;
-            min-height: 60px;
-            line-height: 1.4;
-            font-family: inherit;
-        }
-
-        /* Profile section with expanding textarea */
-        .profile-section {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        .profile-section .form-grid {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .profile-section .form-group.expand {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .profile-section .form-group.expand textarea {
-            flex: 1;
-            resize: none;
-        }
-
-        textarea.form-control::placeholder {
-            color: var(--placeholder-color);
-        }
-
-        .current-selection {
-            display: inline-flex;
-            align-items: center;
-            font-size: 10px;
-            color: var(--text-secondary);
-            background: var(--bg-tertiary);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
-        }
-
-        .keybind-input {
-            cursor: pointer;
-            font-family: 'SF Mono', Monaco, monospace;
-            text-align: center;
-            letter-spacing: 0.5px;
-            font-weight: 500;
-        }
-
-        .keybind-input:focus {
-            cursor: text;
-        }
-
-        .keybind-input::placeholder {
-            color: var(--placeholder-color);
-            font-style: italic;
-        }
-
-        .reset-keybinds-button {
-            background: transparent;
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.1s ease;
-        }
-
-        .reset-keybinds-button:hover {
-            background: var(--hover-background);
-        }
-
-        .keybinds-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-        }
-
-        .keybinds-table th,
-        .keybinds-table td {
-            padding: 8px 0;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .keybinds-table th {
-            font-weight: 600;
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .keybinds-table td {
-            vertical-align: middle;
-        }
-
-        .keybinds-table .action-name {
-            font-weight: 500;
-            color: var(--text-color);
-            font-size: 12px;
-        }
-
-        .keybinds-table .action-description {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 1px;
-        }
-
-        .keybinds-table .keybind-input {
-            min-width: 100px;
-            padding: 4px 8px;
-            margin: 0;
-            font-size: 11px;
-        }
-
-        .keybinds-table tr:hover {
-            background: var(--hover-background);
-        }
-
-        .keybinds-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .table-reset-row {
-            border-top: 1px solid var(--border-color);
-        }
-
-        .table-reset-row td {
-            padding-top: 10px;
-            padding-bottom: 8px;
-            border-bottom: none;
-        }
-
-        .table-reset-row:hover {
-            background: transparent;
-        }
-
-        .settings-note {
-            font-size: 11px;
-            color: var(--text-muted);
-            text-align: center;
-            margin-top: 16px;
-            padding: 12px;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 0;
-        }
-
-        .checkbox-input {
-            width: 14px;
-            height: 14px;
-            accent-color: var(--text-color);
-            cursor: pointer;
-        }
-
-        .checkbox-label {
-            font-weight: 500;
-            font-size: 12px;
-            color: var(--text-color);
-            cursor: pointer;
-            user-select: none;
-        }
-
-        /* Slider styles */
-        .slider-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .slider-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .slider-value {
-            font-size: 11px;
-            color: var(--text-secondary);
-            background: var(--bg-tertiary);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
-            font-family: 'SF Mono', Monaco, monospace;
-        }
-
-        .slider-input {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 4px;
-            border-radius: 2px;
-            background: var(--border-color);
-            outline: none;
-            cursor: pointer;
-        }
-
-        .slider-input::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: var(--text-color);
-            cursor: pointer;
-            border: none;
-        }
-
-        .slider-input::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: var(--text-color);
-            cursor: pointer;
-            border: none;
-        }
-
-        .slider-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 4px;
-            font-size: 10px;
-            color: var(--text-muted);
-        }
-
-        /* Color picker styles */
-        .color-picker-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .color-picker-input {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 40px;
-            height: 32px;
-            border: 1px solid var(--border-color);
-            border-radius: 3px;
-            cursor: pointer;
-            padding: 2px;
-            background: var(--input-background);
-        }
-
-        .color-picker-input::-webkit-color-swatch-wrapper {
-            padding: 0;
-        }
-
-        .color-picker-input::-webkit-color-swatch {
-            border: none;
-            border-radius: 2px;
-        }
-
-        .color-hex-input {
-            width: 80px;
-            font-family: 'SF Mono', Monaco, monospace;
-            text-transform: uppercase;
-        }
-
-        .reset-color-button {
-            background: transparent;
-            color: var(--text-secondary);
-            border: 1px solid var(--border-color);
-            padding: 6px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.1s ease;
-        }
-
-        .reset-color-button:hover {
-            background: var(--hover-background);
-            color: var(--text-color);
-        }
-
-        /* Danger button and status */
-        .danger-button {
-            background: transparent;
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
-            padding: 8px 14px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.1s ease;
-        }
-
-        .danger-button:hover {
-            background: rgba(241, 76, 76, 0.1);
-        }
-
-        .danger-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .status-message {
-            margin-top: 12px;
-            padding: 8px 12px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        .status-success {
-            background: var(--bg-secondary);
-            color: var(--success-color);
-            border-left: 2px solid var(--success-color);
-        }
-
-        .status-error {
-            background: var(--bg-secondary);
-            color: var(--error-color);
-            border-left: 2px solid var(--error-color);
-        }
-
-    `;
-
-    static properties = {
-        selectedProfile: { type: String },
-        selectedLanguage: { type: String },
-        selectedImageQuality: { type: String },
-        layoutMode: { type: String },
-        keybinds: { type: Object },
-        googleSearchEnabled: { type: Boolean },
-        backgroundTransparency: { type: Number },
-        fontSize: { type: Number },
-        theme: { type: String },
-        audioInputMode: { type: String },
-        onProfileChange: { type: Function },
-        onLanguageChange: { type: Function },
-        onImageQualityChange: { type: Function },
-        onLayoutModeChange: { type: Function },
-        activeSection: { type: String },
-        isClearing: { type: Boolean },
-        clearStatusMessage: { type: String },
-        clearStatusType: { type: String },
+  static styles = [
+    unifiedPageStyles,
+    css`
+      .danger-surface {
+        border-color: var(--danger);
+      }
+
+      .warning-callout {
+        position: relative;
+        margin-top: 4px;
+        padding: 8px 12px;
+        border: 1px solid var(--danger);
+        border-radius: var(--radius-sm);
+        color: var(--danger);
+        font-size: var(--font-size-xs);
+        line-height: 1.4;
+        background: rgba(239, 68, 68, 0.06);
+      }
+
+      .warning-callout::before {
+        content: "";
+        position: absolute;
+        top: -6px;
+        left: 16px;
+        width: 10px;
+        height: 10px;
+        background: var(--bg-surface);
+        border-top: 1px solid var(--danger);
+        border-left: 1px solid var(--danger);
+        transform: rotate(45deg);
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        padding: var(--space-sm);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--bg-elevated);
+      }
+
+      .toggle-input {
+        width: 14px;
+        height: 14px;
+        accent-color: var(--text-primary);
+        cursor: pointer;
+      }
+
+      .toggle-label {
+        color: var(--text-primary);
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .slider-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-xs);
+      }
+
+      .slider-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-sm);
+      }
+
+      .slider-value {
+        font-family: var(--font-mono);
+        font-size: var(--font-size-xs);
+        color: var(--text-secondary);
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 2px 8px;
+      }
+
+      .slider-input {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--border);
+        outline: none;
+        cursor: pointer;
+      }
+
+      .slider-input::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--text-primary);
+        border: none;
+      }
+
+      .slider-input::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--text-primary);
+        border: none;
+      }
+
+      .keybind-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--space-sm) 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .keybind-row:last-of-type {
+        border-bottom: none;
+      }
+
+      .keybind-name {
+        color: var(--text-secondary);
+        font-size: var(--font-size-sm);
+      }
+
+      .keybind-input {
+        width: 140px;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: var(--font-size-xs);
+      }
+
+      .danger-button {
+        border: 1px solid var(--danger);
+        color: var(--danger);
+        background: transparent;
+        border-radius: var(--radius-sm);
+        padding: 9px 12px;
+        font-size: var(--font-size-sm);
+        cursor: pointer;
+        transition: background var(--transition);
+      }
+
+      .danger-button:hover {
+        background: rgba(241, 76, 76, 0.11);
+      }
+
+      .danger-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .status {
+        margin-top: var(--space-sm);
+        padding: var(--space-sm);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        font-size: var(--font-size-xs);
+      }
+
+      .status.success {
+        border-color: var(--success);
+        color: var(--success);
+      }
+
+      .status.error {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+    `,
+  ];
+
+  static properties = {
+    selectedProfile: { type: String },
+    selectedLanguage: { type: String },
+    providerMode: { type: String },
+    selectedImageQuality: { type: String },
+    layoutMode: { type: String },
+    keybinds: { type: Object },
+    googleSearchEnabled: { type: Boolean },
+    backgroundTransparency: { type: Number },
+    fontSize: { type: Number },
+    theme: { type: String },
+    onProfileChange: { type: Function },
+    onLanguageChange: { type: Function },
+    onImageQualityChange: { type: Function },
+    onLayoutModeChange: { type: Function },
+    isClearing: { type: Boolean },
+    isRestoring: { type: Boolean },
+    clearStatusMessage: { type: String },
+    clearStatusType: { type: String },
+  };
+
+  constructor() {
+    super();
+    this.selectedProfile = "interview";
+    this.selectedLanguage = "en-US";
+    this.selectedImageQuality = "medium";
+    this.layoutMode = "normal";
+    this.keybinds = this.getDefaultKeybinds();
+    this.onProfileChange = () => {};
+    this.onLanguageChange = () => {};
+    this.onImageQualityChange = () => {};
+    this.onLayoutModeChange = () => {};
+    this.googleSearchEnabled = true;
+    this.providerMode = "byok";
+    this.isClearing = false;
+    this.isRestoring = false;
+    this.clearStatusMessage = "";
+    this.clearStatusType = "";
+    this.backgroundTransparency = 0.8;
+    this.fontSize = 20;
+    this.audioMode = "speaker_only";
+    this.customPrompt = "";
+    this.theme = "dark";
+    this._loadFromStorage();
+  }
+
+  getThemes() {
+    return cheatingDaddy.theme.getAll();
+  }
+
+  async _loadFromStorage() {
+    try {
+      const [prefs, keybinds] = await Promise.all([
+        cheatingDaddy.storage.getPreferences(),
+        cheatingDaddy.storage.getKeybinds(),
+      ]);
+      this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
+      this.providerMode = prefs.providerMode || "byok";
+      this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
+      this.fontSize = prefs.fontSize ?? 20;
+      this.audioMode = prefs.audioMode ?? "speaker_only";
+      this.customPrompt = prefs.customPrompt ?? "";
+      this.theme = prefs.theme ?? "dark";
+      if (keybinds) {
+        this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
+      }
+      this.updateBackgroundAppearance();
+      this.updateFontSize();
+      this.requestUpdate();
+    } catch (error) {
+      console.error("Error loading settings:", error);
+    }
+  }
+
+  getProfiles() {
+    return [
+      { value: "interview", name: "Job Interview" },
+      { value: "sales", name: "Sales Call" },
+      { value: "meeting", name: "Business Meeting" },
+      { value: "presentation", name: "Presentation" },
+      { value: "negotiation", name: "Negotiation" },
+      { value: "exam", name: "Exam Assistant" },
+    ];
+  }
+
+  getLanguages() {
+    return [
+      { value: "auto", name: "Auto (Multilingual)" },
+      { value: "en-US", name: "English (US)" },
+      { value: "en-GB", name: "English (UK)" },
+      { value: "en-AU", name: "English (Australia)" },
+      { value: "en-IN", name: "English (India)" },
+      { value: "de-DE", name: "German (Germany)" },
+      { value: "es-US", name: "Spanish (US)" },
+      { value: "es-ES", name: "Spanish (Spain)" },
+      { value: "fr-FR", name: "French (France)" },
+      { value: "fr-CA", name: "French (Canada)" },
+      { value: "hi-IN", name: "Hindi (India)" },
+      { value: "pt-BR", name: "Portuguese (Brazil)" },
+      { value: "ar-XA", name: "Arabic (Generic)" },
+      { value: "id-ID", name: "Indonesian (Indonesia)" },
+      { value: "it-IT", name: "Italian (Italy)" },
+      { value: "ja-JP", name: "Japanese (Japan)" },
+      { value: "tr-TR", name: "Turkish (Turkey)" },
+      { value: "vi-VN", name: "Vietnamese (Vietnam)" },
+      { value: "bn-IN", name: "Bengali (India)" },
+      { value: "gu-IN", name: "Gujarati (India)" },
+      { value: "kn-IN", name: "Kannada (India)" },
+      { value: "ml-IN", name: "Malayalam (India)" },
+      { value: "mr-IN", name: "Marathi (India)" },
+      { value: "ta-IN", name: "Tamil (India)" },
+      { value: "te-IN", name: "Telugu (India)" },
+      { value: "nl-NL", name: "Dutch (Netherlands)" },
+      { value: "ko-KR", name: "Korean (South Korea)" },
+      { value: "cmn-CN", name: "Mandarin Chinese (China)" },
+      { value: "pl-PL", name: "Polish (Poland)" },
+      { value: "ru-RU", name: "Russian (Russia)" },
+      { value: "th-TH", name: "Thai (Thailand)" },
+    ];
+  }
+
+  getDefaultKeybinds() {
+    const isMac = cheatingDaddy.isMacOS || navigator.platform.includes("Mac");
+    return {
+      moveUp: isMac ? "Alt+Up" : "Ctrl+Up",
+      moveDown: isMac ? "Alt+Down" : "Ctrl+Down",
+      moveLeft: isMac ? "Alt+Left" : "Ctrl+Left",
+      moveRight: isMac ? "Alt+Right" : "Ctrl+Right",
+      toggleVisibility: isMac ? "Cmd+\\" : "Ctrl+\\",
+      toggleClickThrough: isMac ? "Cmd+M" : "Ctrl+M",
+      nextStep: isMac ? "Cmd+Enter" : "Ctrl+Enter",
+      previousResponse: isMac ? "Cmd+[" : "Ctrl+[",
+      nextResponse: isMac ? "Cmd+]" : "Ctrl+]",
+      scrollUp: isMac ? "Cmd+Shift+Up" : "Ctrl+Shift+Up",
+      scrollDown: isMac ? "Cmd+Shift+Down" : "Ctrl+Shift+Down",
+      expandResponse: isMac ? "Cmd+E" : "Ctrl+E",
     };
+  }
 
-    constructor() {
-        super();
-        this.selectedProfile = 'interview';
-        this.selectedLanguage = 'en-US';
-        this.selectedImageQuality = 'medium';
-        this.layoutMode = 'normal';
-        this.keybinds = this.getDefaultKeybinds();
-        this.onProfileChange = () => {};
-        this.onLanguageChange = () => {};
-        this.onImageQualityChange = () => {};
-        this.onLayoutModeChange = () => {};
+  getKeybindActions() {
+    return [
+      {
+        key: "moveUp",
+        name: "Move Window Up",
+        description: "Move the app window up",
+      },
+      {
+        key: "moveDown",
+        name: "Move Window Down",
+        description: "Move the app window down",
+      },
+      {
+        key: "moveLeft",
+        name: "Move Window Left",
+        description: "Move the app window left",
+      },
+      {
+        key: "moveRight",
+        name: "Move Window Right",
+        description: "Move the app window right",
+      },
+      {
+        key: "toggleVisibility",
+        name: "Toggle Visibility",
+        description: "Show or hide the app window",
+      },
+      {
+        key: "toggleClickThrough",
+        name: "Toggle Click-through",
+        description: "Enable or disable click-through mode",
+      },
+      {
+        key: "nextStep",
+        name: "Ask Next Step",
+        description: "Take screenshot and ask for next step",
+      },
+      {
+        key: "previousResponse",
+        name: "Previous Response",
+        description: "Move to previous AI response",
+      },
+      {
+        key: "nextResponse",
+        name: "Next Response",
+        description: "Move to next AI response",
+      },
+      {
+        key: "scrollUp",
+        name: "Scroll Response Up",
+        description: "Scroll response content upward",
+      },
+      {
+        key: "scrollDown",
+        name: "Scroll Response Down",
+        description: "Scroll response content downward",
+      },
+      {
+        key: "expandResponse",
+        name: "Expand Response",
+        description: "Expand the current response with more detail",
+      },
+    ];
+  }
 
-        // Google Search default
-        this.googleSearchEnabled = true;
+  async saveKeybinds() {
+    await cheatingDaddy.storage.setKeybinds(this.keybinds);
+    if (window.require) {
+      const { ipcRenderer } = window.require("electron");
+      ipcRenderer.send("update-keybinds", this.keybinds);
+    }
+  }
 
-        // Clear data state
-        this.isClearing = false;
-        this.clearStatusMessage = '';
-        this.clearStatusType = '';
+  handleProfileSelect(e) {
+    this.selectedProfile = e.target.value;
+    this.onProfileChange(this.selectedProfile);
+  }
 
-        // Background transparency default
-        this.backgroundTransparency = 0.8;
+  handleLanguageSelect(e) {
+    this.selectedLanguage = e.target.value;
+    this.onLanguageChange(this.selectedLanguage);
+  }
 
-        // Font size default (in pixels)
-        this.fontSize = 20;
+  handleImageQualitySelect(e) {
+    this.selectedImageQuality = e.target.value;
+    this.onImageQualityChange(this.selectedImageQuality);
+  }
 
-        // Audio mode default
-        this.audioMode = 'speaker_only';
-        this.audioInputMode = 'auto';
+  handleLayoutModeSelect(e) {
+    this.layoutMode = e.target.value;
+    this.onLayoutModeChange(this.layoutMode);
+  }
 
-        // Custom prompt
-        this.customPrompt = '';
+  async handleCustomPromptInput(e) {
+    this.customPrompt = e.target.value;
+    await cheatingDaddy.storage.updatePreference(
+      "customPrompt",
+      this.customPrompt,
+    );
+  }
 
-        // Active section for sidebar navigation
-        this.activeSection = 'profile';
+  async handleAudioModeSelect(e) {
+    this.audioMode = e.target.value;
+    await cheatingDaddy.storage.updatePreference("audioMode", this.audioMode);
+    this.requestUpdate();
+  }
 
-        // Theme default
-        this.theme = 'dark';
+  async handleProviderModeChange(e) {
+    this.providerMode = e.target.value;
+    await cheatingDaddy.storage.updatePreference(
+      "providerMode",
+      this.providerMode,
+    );
+    this.requestUpdate();
+  }
 
-        // AI Provider settings
-        this.aiProvider = 'gemini';
-        this.geminiApiKey = '';
-        this.openaiApiKey = '';
-        this.openaiBaseUrl = '';
-        this.openaiModel = 'gpt-4o-realtime-preview-2024-12-17';
-        // OpenAI SDK settings
-        this.openaiSdkApiKey = '';
-        this.openaiSdkBaseUrl = '';
-        this.openaiSdkModel = 'gpt-4o';
-        this.openaiSdkVisionModel = 'gpt-4o';
-        this.openaiSdkWhisperModel = 'whisper-1';
+  async handleThemeChange(e) {
+    this.theme = e.target.value;
+    await cheatingDaddy.theme.save(this.theme);
+    this.updateBackgroundAppearance();
+    this.requestUpdate();
+  }
 
-        this._loadFromStorage();
+  async handleGoogleSearchChange(e) {
+    this.googleSearchEnabled = e.target.checked;
+    await cheatingDaddy.storage.updatePreference(
+      "googleSearchEnabled",
+      this.googleSearchEnabled,
+    );
+    if (window.require) {
+      try {
+        const { ipcRenderer } = window.require("electron");
+        await ipcRenderer.invoke(
+          "update-google-search-setting",
+          this.googleSearchEnabled,
+        );
+      } catch (error) {
+        console.error("Failed to notify main process:", error);
+      }
+    }
+    this.requestUpdate();
+  }
+
+  async handleBackgroundTransparencyChange(e) {
+    this.backgroundTransparency = parseFloat(e.target.value);
+    await cheatingDaddy.storage.updatePreference(
+      "backgroundTransparency",
+      this.backgroundTransparency,
+    );
+    this.updateBackgroundAppearance();
+    this.requestUpdate();
+  }
+
+  updateBackgroundAppearance() {
+    const colors = cheatingDaddy.theme.get(this.theme);
+    cheatingDaddy.theme.applyBackgrounds(
+      colors.background,
+      this.backgroundTransparency,
+    );
+  }
+
+  async handleFontSizeChange(e) {
+    this.fontSize = parseInt(e.target.value, 10);
+    await cheatingDaddy.storage.updatePreference("fontSize", this.fontSize);
+    this.updateFontSize();
+    this.requestUpdate();
+  }
+
+  updateFontSize() {
+    document.documentElement.style.setProperty(
+      "--response-font-size",
+      `${this.fontSize}px`,
+    );
+  }
+
+  handleKeybindChange(action, value) {
+    this.keybinds = { ...this.keybinds, [action]: value };
+    this.saveKeybinds();
+    this.requestUpdate();
+  }
+
+  handleKeybindFocus(e) {
+    e.target.placeholder = "Press key combination...";
+    e.target.select();
+  }
+
+  handleKeybindInput(e) {
+    e.preventDefault();
+    const modifiers = [];
+    if (e.ctrlKey) modifiers.push("Ctrl");
+    if (e.metaKey) modifiers.push("Cmd");
+    if (e.altKey) modifiers.push("Alt");
+    if (e.shiftKey) modifiers.push("Shift");
+    let mainKey = e.key;
+
+    switch (e.code) {
+      case "ArrowUp":
+        mainKey = "Up";
+        break;
+      case "ArrowDown":
+        mainKey = "Down";
+        break;
+      case "ArrowLeft":
+        mainKey = "Left";
+        break;
+      case "ArrowRight":
+        mainKey = "Right";
+        break;
+      case "Enter":
+        mainKey = "Enter";
+        break;
+      case "Space":
+        mainKey = "Space";
+        break;
+      case "Backslash":
+        mainKey = "\\";
+        break;
+      default:
+        if (e.key.length === 1) mainKey = e.key.toUpperCase();
+        break;
     }
 
-    getThemes() {
-        return mastermind.theme.getAll();
-    }
+    if (["Control", "Meta", "Alt", "Shift"].includes(e.key)) return;
 
-    setActiveSection(section) {
-        this.activeSection = section;
+    const action = e.target.dataset.action;
+    const keybind = [...modifiers, mainKey].join("+");
+    this.handleKeybindChange(action, keybind);
+    e.target.value = keybind;
+    e.target.blur();
+  }
+
+  async resetKeybinds() {
+    this.keybinds = this.getDefaultKeybinds();
+    await cheatingDaddy.storage.setKeybinds(null);
+    if (window.require) {
+      const { ipcRenderer } = window.require("electron");
+      ipcRenderer.send("update-keybinds", this.keybinds);
+    }
+    this.requestUpdate();
+  }
+
+  async restoreAllSettings() {
+    if (this.isRestoring) return;
+    this.isRestoring = true;
+    this.clearStatusMessage = "";
+    this.clearStatusType = "";
+    this.requestUpdate();
+    try {
+      // Restore all preferences to defaults
+      const defaults = {
+        customPrompt: "",
+        selectedProfile: "interview",
+        selectedLanguage: "en-US",
+        selectedScreenshotInterval: "5",
+        selectedImageQuality: "medium",
+        audioMode: "speaker_only",
+        fontSize: 20,
+        backgroundTransparency: 0.8,
+        googleSearchEnabled: false,
+        theme: "dark",
+      };
+      for (const [key, value] of Object.entries(defaults)) {
+        await cheatingDaddy.storage.updatePreference(key, value);
+      }
+
+      // Restore keybinds
+      this.keybinds = this.getDefaultKeybinds();
+      await cheatingDaddy.storage.setKeybinds(null);
+      if (window.require) {
+        const { ipcRenderer } = window.require("electron");
+        ipcRenderer.send("update-keybinds", this.keybinds);
+      }
+
+      // Apply to local state
+      this.selectedProfile = defaults.selectedProfile;
+      this.selectedLanguage = defaults.selectedLanguage;
+      this.selectedImageQuality = defaults.selectedImageQuality;
+      this.audioMode = defaults.audioMode;
+      this.fontSize = defaults.fontSize;
+      this.backgroundTransparency = defaults.backgroundTransparency;
+      this.googleSearchEnabled = defaults.googleSearchEnabled;
+      this.customPrompt = defaults.customPrompt;
+      this.theme = defaults.theme;
+
+      // Notify parent callbacks
+      this.onProfileChange(defaults.selectedProfile);
+      this.onLanguageChange(defaults.selectedLanguage);
+      this.onImageQualityChange(defaults.selectedImageQuality);
+
+      // Apply visual changes
+      this.updateBackgroundAppearance();
+      this.updateFontSize();
+      await cheatingDaddy.theme.save(defaults.theme);
+
+      this.clearStatusMessage = "All settings restored to defaults";
+      this.clearStatusType = "success";
+    } catch (error) {
+      console.error("Error restoring settings:", error);
+      this.clearStatusMessage = `Error restoring settings: ${error.message}`;
+      this.clearStatusType = "error";
+    } finally {
+      this.isRestoring = false;
+      this.requestUpdate();
+    }
+  }
+
+  async clearLocalData() {
+    if (this.isClearing) return;
+    this.isClearing = true;
+    this.clearStatusMessage = "";
+    this.clearStatusType = "";
+    this.requestUpdate();
+    try {
+      await cheatingDaddy.storage.clearAll();
+      this.clearStatusMessage = "Successfully cleared all local data";
+      this.clearStatusType = "success";
+      this.requestUpdate();
+      setTimeout(() => {
+        this.clearStatusMessage = "Closing application...";
         this.requestUpdate();
+        setTimeout(async () => {
+          if (window.require) {
+            const { ipcRenderer } = window.require("electron");
+            await ipcRenderer.invoke("quit-application");
+          }
+        }, 1000);
+      }, 2000);
+    } catch (error) {
+      console.error("Error clearing data:", error);
+      this.clearStatusMessage = `Error clearing data: ${error.message}`;
+      this.clearStatusType = "error";
+    } finally {
+      this.isClearing = false;
+      this.requestUpdate();
     }
+  }
 
-    getSidebarSections() {
-        return [
-            { id: 'profile', name: 'Profile', icon: 'user' },
-            { id: 'ai-provider', name: 'AI Provider', icon: 'cpu' },
-            { id: 'appearance', name: 'Appearance', icon: 'display' },
-            { id: 'audio', name: 'Audio', icon: 'mic' },
-            { id: 'language', name: 'Language', icon: 'globe' },
-            { id: 'capture', name: 'Capture', icon: 'camera' },
-            { id: 'keyboard', name: 'Keyboard', icon: 'keyboard' },
-            { id: 'search', name: 'Search', icon: 'search' },
-            { id: 'advanced', name: 'Advanced', icon: 'warning', danger: true },
-        ];
-    }
-
-    renderSidebarIcon(icon) {
-        const icons = {
-            user: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+  renderAISection() {
+    return html`
+      <section class="surface">
+        <div class="surface-title">AI Engine</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Regime</label>
+            <select
+              class="control"
+              .value=${this.providerMode}
+              @change=${this.handleProviderModeChange}
             >
-                <path
-                    d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"
-                ></path>
-                <circle cx="12" cy="7" r="4"></circle>
-            </svg>`,
-            mic: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+              <option value="byok">BYOK (API Keys)</option>
+              <option value="local">Local AI (Ollama)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  renderAudioSection() {
+    return html`
+      <section class="surface">
+        <div class="surface-title">Audio Input</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Audio Mode</label>
+            <select
+              class="control"
+              .value=${this.audioMode}
+              @change=${this.handleAudioModeSelect}
             >
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>`,
-            globe: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+              <option value="speaker_only">Speaker Only (Interviewer)</option>
+              <option value="mic_only">Microphone Only (Me)</option>
+              <option value="both">Both Speaker and Microphone</option>
+            </select>
+          </div>
+          ${this.audioMode !== "speaker_only"
+            ? html`
+                <div class="warning-callout">
+                  May cause unexpected behavior. Only change this if you know
+                  what you're doing.
+                </div>
+              `
+            : ""}
+          <div class="form-group">
+            <label class="form-label">Image Quality</label>
+            <select
+              class="control"
+              .value=${this.selectedImageQuality}
+              @change=${this.handleImageQualitySelect}
             >
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-            </svg>`,
-            display: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+              <option value="high">High Quality</option>
+              <option value="medium">Medium Quality</option>
+              <option value="low">Low Quality</option>
+            </select>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  renderLanguageSection() {
+    return html`
+      <section class="surface">
+        <div class="surface-title">Language</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Speech Language</label>
+            <select
+              class="control"
+              .value=${this.selectedLanguage}
+              @change=${this.handleLanguageSelect}
             >
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>`,
-            camera: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+              ${this.getLanguages().map(
+                (language) =>
+                  html`<option
+                    value=${language.value}
+                    ?selected=${language.value === this.selectedLanguage}
+                  >
+                    ${language.name}
+                  </option>`,
+              )}
+            </select>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  renderAppearanceSection() {
+    return html`
+      <section class="surface">
+        <div class="surface-title">Appearance</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Theme</label>
+            <select
+              class="control"
+              .value=${this.theme}
+              @change=${this.handleThemeChange}
             >
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-            </svg>`,
-            keyboard: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-                <path d="M6 8h.001"></path>
-                <path d="M10 8h.001"></path>
-                <path d="M14 8h.001"></path>
-                <path d="M18 8h.001"></path>
-                <path d="M8 12h.001"></path>
-                <path d="M12 12h.001"></path>
-                <path d="M16 12h.001"></path>
-                <path d="M7 16h10"></path>
-            </svg>`,
-            search: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>`,
-            cpu: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                <rect x="9" y="9" width="6" height="6"></rect>
-                <line x1="9" y1="1" x2="9" y2="4"></line>
-                <line x1="15" y1="1" x2="15" y2="4"></line>
-                <line x1="9" y1="20" x2="9" y2="23"></line>
-                <line x1="15" y1="20" x2="15" y2="23"></line>
-                <line x1="20" y1="9" x2="23" y2="9"></line>
-                <line x1="20" y1="14" x2="23" y2="14"></line>
-                <line x1="1" y1="9" x2="4" y2="9"></line>
-                <line x1="1" y1="14" x2="4" y2="14"></line>
-            </svg>`,
-            warning: html`<svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>`,
-        };
-        return icons[icon] || '';
-    }
-
-    async _loadFromStorage() {
-        try {
-            const [prefs, keybinds, credentials, openaiCreds, openaiSdkCreds] = await Promise.all([
-                mastermind.storage.getPreferences(),
-                mastermind.storage.getKeybinds(),
-                mastermind.storage.getCredentials(),
-                mastermind.storage.getOpenAICredentials(),
-                mastermind.storage.getOpenAISDKCredentials(),
-            ]);
-
-            this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
-            this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
-            this.fontSize = prefs.fontSize ?? 20;
-            this.audioMode = prefs.audioMode ?? 'speaker_only';
-            this.audioInputMode = prefs.audioInputMode ?? 'auto';
-            this.customPrompt = prefs.customPrompt ?? '';
-            this.theme = prefs.theme ?? 'dark';
-            this.aiProvider = prefs.aiProvider ?? 'gemini';
-
-            // Load Gemini API key
-            this.geminiApiKey = credentials.apiKey ?? '';
-
-            // Load OpenAI Realtime credentials
-            this.openaiApiKey = openaiCreds.apiKey ?? '';
-            this.openaiBaseUrl = openaiCreds.baseUrl ?? '';
-            this.openaiModel = openaiCreds.model ?? 'gpt-4o-realtime-preview-2024-12-17';
-
-            // Load OpenAI SDK credentials
-            this.openaiSdkApiKey = openaiSdkCreds.apiKey ?? '';
-            this.openaiSdkBaseUrl = openaiSdkCreds.baseUrl ?? '';
-            this.openaiSdkModel = openaiSdkCreds.model ?? 'gpt-4o';
-            this.openaiSdkVisionModel = openaiSdkCreds.visionModel ?? 'gpt-4o';
-            this.openaiSdkWhisperModel = openaiSdkCreds.whisperModel ?? 'whisper-1';
-
-            if (keybinds) {
-                this.keybinds = { ...this.getDefaultKeybinds(), ...keybinds };
-            }
-
-            this.updateBackgroundTransparency();
-            this.updateFontSize();
-            this.notifyPushToTalkSettings();
-            this.requestUpdate();
-        } catch (error) {
-            console.error('Error loading settings:', error);
-        }
-    }
-
-    connectedCallback() {
-        super.connectedCallback();
-        // Resize window for this view
-        resizeLayout();
-    }
-
-    disconnectedCallback() {
-        super.disconnectedCallback();
-    }
-
-    getProfiles() {
-        return [
-            {
-                value: 'interview',
-                name: 'Job Interview',
-                description: 'Get help with answering interview questions',
-            },
-            {
-                value: 'sales',
-                name: 'Sales Call',
-                description: 'Assist with sales conversations and objection handling',
-            },
-            {
-                value: 'meeting',
-                name: 'Business Meeting',
-                description: 'Support for professional meetings and discussions',
-            },
-            {
-                value: 'presentation',
-                name: 'Presentation',
-                description: 'Help with presentations and public speaking',
-            },
-            {
-                value: 'negotiation',
-                name: 'Negotiation',
-                description: 'Guidance for business negotiations and deals',
-            },
-            {
-                value: 'exam',
-                name: 'Exam Assistant',
-                description: 'Academic assistance for test-taking and exam questions',
-            },
-        ];
-    }
-
-    getLanguages() {
-        return [
-            { value: 'en-US', name: 'English (US)' },
-            { value: 'en-GB', name: 'English (UK)' },
-            { value: 'en-AU', name: 'English (Australia)' },
-            { value: 'en-IN', name: 'English (India)' },
-            { value: 'de-DE', name: 'German (Germany)' },
-            { value: 'es-US', name: 'Spanish (United States)' },
-            { value: 'es-ES', name: 'Spanish (Spain)' },
-            { value: 'fr-FR', name: 'French (France)' },
-            { value: 'fr-CA', name: 'French (Canada)' },
-            { value: 'hi-IN', name: 'Hindi (India)' },
-            { value: 'pt-BR', name: 'Portuguese (Brazil)' },
-            { value: 'ar-XA', name: 'Arabic (Generic)' },
-            { value: 'id-ID', name: 'Indonesian (Indonesia)' },
-            { value: 'it-IT', name: 'Italian (Italy)' },
-            { value: 'ja-JP', name: 'Japanese (Japan)' },
-            { value: 'tr-TR', name: 'Turkish (Turkey)' },
-            { value: 'vi-VN', name: 'Vietnamese (Vietnam)' },
-            { value: 'bn-IN', name: 'Bengali (India)' },
-            { value: 'gu-IN', name: 'Gujarati (India)' },
-            { value: 'kn-IN', name: 'Kannada (India)' },
-            { value: 'ml-IN', name: 'Malayalam (India)' },
-            { value: 'mr-IN', name: 'Marathi (India)' },
-            { value: 'ta-IN', name: 'Tamil (India)' },
-            { value: 'te-IN', name: 'Telugu (India)' },
-            { value: 'nl-NL', name: 'Dutch (Netherlands)' },
-            { value: 'ko-KR', name: 'Korean (South Korea)' },
-            { value: 'cmn-CN', name: 'Mandarin Chinese (China)' },
-            { value: 'pl-PL', name: 'Polish (Poland)' },
-            { value: 'ru-RU', name: 'Russian (Russia)' },
-            { value: 'th-TH', name: 'Thai (Thailand)' },
-        ];
-    }
-
-    getProfileNames() {
-        return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
-        };
-    }
-
-    handleProfileSelect(e) {
-        this.selectedProfile = e.target.value;
-        this.onProfileChange(this.selectedProfile);
-    }
-
-    handleLanguageSelect(e) {
-        this.selectedLanguage = e.target.value;
-        this.onLanguageChange(this.selectedLanguage);
-    }
-
-    handleImageQualitySelect(e) {
-        this.selectedImageQuality = e.target.value;
-        this.onImageQualityChange(e.target.value);
-    }
-
-    handleLayoutModeSelect(e) {
-        this.layoutMode = e.target.value;
-        this.onLayoutModeChange(e.target.value);
-    }
-
-    async handleCustomPromptInput(e) {
-        this.customPrompt = e.target.value;
-        await mastermind.storage.updatePreference('customPrompt', e.target.value);
-    }
-
-    async handleAudioModeSelect(e) {
-        this.audioMode = e.target.value;
-        await mastermind.storage.updatePreference('audioMode', e.target.value);
-        this.requestUpdate();
-    }
-
-    async handleAudioInputModeChange(e) {
-        this.audioInputMode = e.target.value;
-        await mastermind.storage.updatePreference('audioInputMode', e.target.value);
-        this.notifyPushToTalkSettings();
-        this.requestUpdate();
-    }
-
-    notifyPushToTalkSettings() {
-        if (!window.require) {
-            return;
-        }
-        try {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-push-to-talk-settings', {
-                inputMode: this.audioInputMode,
-            });
-            ipcRenderer.send('update-keybinds', this.keybinds);
-        } catch (error) {
-            console.error('Failed to notify push-to-talk settings:', error);
-        }
-    }
-
-    async handleThemeChange(e) {
-        this.theme = e.target.value;
-        await mastermind.theme.save(this.theme);
-        this.updateBackgroundAppearance();
-        this.requestUpdate();
-    }
-
-    getDefaultKeybinds() {
-        const isMac = mastermind.isMacOS || navigator.platform.includes('Mac');
-        return {
-            moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
-            moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
-            moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
-            moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
-            toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
-            toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
-            nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
-            previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
-            nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
-            scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
-            scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
-            pushToTalk: isMac ? 'Ctrl+Space' : 'Ctrl+Space',
-        };
-    }
-
-    async saveKeybinds() {
-        await mastermind.storage.setKeybinds(this.keybinds);
-        // Send to main process to update global shortcuts
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-keybinds', this.keybinds);
-        }
-    }
-
-    handleKeybindChange(action, value) {
-        this.keybinds = { ...this.keybinds, [action]: value };
-        this.saveKeybinds();
-        this.requestUpdate();
-    }
-
-    async resetKeybinds() {
-        this.keybinds = this.getDefaultKeybinds();
-        await mastermind.storage.setKeybinds(null);
-        this.requestUpdate();
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('update-keybinds', this.keybinds);
-        }
-    }
-
-    getKeybindActions() {
-        return [
-            {
-                key: 'moveUp',
-                name: 'Move Window Up',
-                description: 'Move the application window up',
-            },
-            {
-                key: 'moveDown',
-                name: 'Move Window Down',
-                description: 'Move the application window down',
-            },
-            {
-                key: 'moveLeft',
-                name: 'Move Window Left',
-                description: 'Move the application window left',
-            },
-            {
-                key: 'moveRight',
-                name: 'Move Window Right',
-                description: 'Move the application window right',
-            },
-            {
-                key: 'toggleVisibility',
-                name: 'Toggle Window Visibility',
-                description: 'Show/hide the application window',
-            },
-            {
-                key: 'toggleClickThrough',
-                name: 'Toggle Click-through Mode',
-                description: 'Enable/disable click-through functionality',
-            },
-            {
-                key: 'nextStep',
-                name: 'Ask Next Step',
-                description: 'Take screenshot and ask AI for the next step suggestion',
-            },
-            {
-                key: 'previousResponse',
-                name: 'Previous Response',
-                description: 'Navigate to the previous AI response',
-            },
-            {
-                key: 'nextResponse',
-                name: 'Next Response',
-                description: 'Navigate to the next AI response',
-            },
-            {
-                key: 'scrollUp',
-                name: 'Scroll Response Up',
-                description: 'Scroll the AI response content up',
-            },
-            {
-                key: 'scrollDown',
-                name: 'Scroll Response Down',
-                description: 'Scroll the AI response content down',
-            },
-            {
-                key: 'pushToTalk',
-                name: 'Push-to-Talk',
-                description: 'Activate audio recording (OpenAI SDK only)',
-            },
-        ];
-    }
-
-    handleKeybindFocus(e) {
-        e.target.placeholder = 'Press key combination...';
-        e.target.select();
-    }
-
-    handleKeybindInput(e) {
-        e.preventDefault();
-
-        const modifiers = [];
-        const keys = [];
-
-        // Check modifiers
-        if (e.ctrlKey) modifiers.push('Ctrl');
-        if (e.metaKey) modifiers.push('Cmd');
-        if (e.altKey) modifiers.push('Alt');
-        if (e.shiftKey) modifiers.push('Shift');
-
-        // Get the main key
-        let mainKey = e.key;
-
-        // Handle special keys
-        switch (e.code) {
-            case 'ArrowUp':
-                mainKey = 'Up';
-                break;
-            case 'ArrowDown':
-                mainKey = 'Down';
-                break;
-            case 'ArrowLeft':
-                mainKey = 'Left';
-                break;
-            case 'ArrowRight':
-                mainKey = 'Right';
-                break;
-            case 'Enter':
-                mainKey = 'Enter';
-                break;
-            case 'Space':
-                mainKey = 'Space';
-                break;
-            case 'Backslash':
-                mainKey = '\\';
-                break;
-            case 'KeyS':
-                if (e.shiftKey) mainKey = 'S';
-                break;
-            case 'KeyM':
-                mainKey = 'M';
-                break;
-            default:
-                if (e.key.length === 1) {
-                    mainKey = e.key.toUpperCase();
-                }
-                break;
-        }
-
-        // Skip if only modifier keys are pressed
-        if (['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) {
-            return;
-        }
-
-        // Construct keybind string
-        const keybind = [...modifiers, mainKey].join('+');
-
-        // Get the action from the input's data attribute
-        const action = e.target.dataset.action;
-
-        // Update the keybind
-        this.handleKeybindChange(action, keybind);
-
-        // Update the input value
-        e.target.value = keybind;
-        e.target.blur();
-    }
-
-    async handleGoogleSearchChange(e) {
-        this.googleSearchEnabled = e.target.checked;
-        await mastermind.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
-
-        // Notify main process if available
-        if (window.require) {
-            try {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('update-google-search-setting', this.googleSearchEnabled);
-            } catch (error) {
-                console.error('Failed to notify main process:', error);
-            }
-        }
-
-        this.requestUpdate();
-    }
-
-    async handleAIProviderChange(e) {
-        this.aiProvider = e.target.value;
-        await mastermind.storage.updatePreference('aiProvider', e.target.value);
-        this.requestUpdate();
-    }
-
-    async handleGeminiApiKeyInput(e) {
-        this.geminiApiKey = e.target.value;
-        await mastermind.storage.setApiKey(e.target.value);
-    }
-
-    async handleOpenAIApiKeyInput(e) {
-        this.openaiApiKey = e.target.value;
-        await mastermind.storage.setOpenAICredentials({
-            apiKey: e.target.value,
-        });
-    }
-
-    async handleOpenAIBaseUrlInput(e) {
-        this.openaiBaseUrl = e.target.value;
-        await mastermind.storage.setOpenAICredentials({
-            baseUrl: e.target.value,
-        });
-    }
-
-    async handleOpenAIModelInput(e) {
-        this.openaiModel = e.target.value;
-        await mastermind.storage.setOpenAICredentials({
-            model: e.target.value,
-        });
-    }
-
-    // OpenAI SDK handlers
-    async handleOpenAISdkApiKeyInput(e) {
-        this.openaiSdkApiKey = e.target.value;
-        await mastermind.storage.setOpenAISDKCredentials({
-            apiKey: e.target.value,
-        });
-    }
-
-    async handleOpenAISdkBaseUrlInput(e) {
-        this.openaiSdkBaseUrl = e.target.value;
-        await mastermind.storage.setOpenAISDKCredentials({
-            baseUrl: e.target.value,
-        });
-    }
-
-    async handleOpenAISdkModelInput(e) {
-        this.openaiSdkModel = e.target.value;
-        await mastermind.storage.setOpenAISDKCredentials({
-            model: e.target.value,
-        });
-    }
-
-    async handleOpenAISdkVisionModelInput(e) {
-        this.openaiSdkVisionModel = e.target.value;
-        await mastermind.storage.setOpenAISDKCredentials({
-            visionModel: e.target.value,
-        });
-    }
-
-    async handleOpenAISdkWhisperModelInput(e) {
-        this.openaiSdkWhisperModel = e.target.value;
-        await mastermind.storage.setOpenAISDKCredentials({
-            whisperModel: e.target.value,
-        });
-    }
-
-    async clearLocalData() {
-        if (this.isClearing) return;
-
-        this.isClearing = true;
-        this.clearStatusMessage = '';
-        this.clearStatusType = '';
-        this.requestUpdate();
-
-        try {
-            await mastermind.storage.clearAll();
-
-            this.clearStatusMessage = 'Successfully cleared all local data';
-            this.clearStatusType = 'success';
-            this.requestUpdate();
-
-            // Close the application after a short delay
-            setTimeout(() => {
-                this.clearStatusMessage = 'Closing application...';
-                this.requestUpdate();
-                setTimeout(async () => {
-                    if (window.require) {
-                        const { ipcRenderer } = window.require('electron');
-                        await ipcRenderer.invoke('quit-application');
-                    }
-                }, 1000);
-            }, 2000);
-        } catch (error) {
-            console.error('Error clearing data:', error);
-            this.clearStatusMessage = `Error clearing data: ${error.message}`;
-            this.clearStatusType = 'error';
-        } finally {
-            this.isClearing = false;
-            this.requestUpdate();
-        }
-    }
-
-    async handleBackgroundTransparencyChange(e) {
-        this.backgroundTransparency = parseFloat(e.target.value);
-        await mastermind.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
-        this.updateBackgroundAppearance();
-        this.requestUpdate();
-    }
-
-    updateBackgroundAppearance() {
-        // Use theme's background color
-        const colors = mastermind.theme.get(this.theme);
-        mastermind.theme.applyBackgrounds(colors.background, this.backgroundTransparency);
-    }
-
-    // Keep old function name for backwards compatibility
-    updateBackgroundTransparency() {
-        this.updateBackgroundAppearance();
-    }
-
-    async handleFontSizeChange(e) {
-        this.fontSize = parseInt(e.target.value, 10);
-        await mastermind.storage.updatePreference('fontSize', this.fontSize);
-        this.updateFontSize();
-        this.requestUpdate();
-    }
-
-    updateFontSize() {
-        const root = document.documentElement;
-        root.style.setProperty('--response-font-size', `${this.fontSize}px`);
-    }
-
-    renderProfileSection() {
-        const profiles = this.getProfiles();
-        const profileNames = this.getProfileNames();
-        const currentProfile = profiles.find(p => p.value === this.selectedProfile);
-
-        return html`
-            <div class="profile-section">
-                <div class="content-header">AI Profile</div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">
-                            Profile Type
-                            <span class="current-selection">${currentProfile?.name || 'Unknown'}</span>
-                        </label>
-                        <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
-                            ${profiles.map(
-                                profile => html`
-                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>${profile.name}</option>
-                                `
-                            )}
-                        </select>
-                    </div>
-
-                    <div class="form-group expand">
-                        <label class="form-label">Custom AI Instructions</label>
-                        <textarea
-                            class="form-control"
-                            placeholder="Add specific instructions for how you want the AI to behave during ${profileNames[this.selectedProfile] ||
-                            'this interaction'}..."
-                            .value=${this.customPrompt}
-                            @input=${this.handleCustomPromptInput}
-                        ></textarea>
-                        <div class="form-description">Personalize the AI's behavior with specific instructions</div>
-                    </div>
-                </div>
+              ${this.getThemes().map(
+                (theme) =>
+                  html`<option value=${theme.value}>${theme.name}</option>`,
+              )}
+            </select>
+          </div>
+          <div class="form-group slider-wrap">
+            <div class="slider-header">
+              <label class="form-label">Background Transparency</label>
+              <span class="slider-value"
+                >${Math.round(this.backgroundTransparency * 100)}%</span
+              >
             </div>
-        `;
-    }
-
-    renderAudioSection() {
-        const isPushToTalkAvailable = this.aiProvider === 'openai-sdk';
-        const pushToTalkDisabled = !isPushToTalkAvailable;
-
-        return html`
-            <div class="content-header">Audio Settings</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">Audio Mode</label>
-                    <select class="form-control" .value=${this.audioMode} @change=${this.handleAudioModeSelect}>
-                        <option value="speaker_only">Speaker Only (Interviewer)</option>
-                        <option value="mic_only">Microphone Only (Me)</option>
-                        <option value="both">Both Speaker & Microphone</option>
-                    </select>
-                    <div class="form-description">Choose which audio sources to capture for the AI.</div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Audio Input Mode</label>
-                    <select
-                        class="form-control"
-                        .value=${this.audioInputMode}
-                        @change=${this.handleAudioInputModeChange}
-                        ?disabled=${pushToTalkDisabled}
-                    >
-                        <option value="auto">Automatic (Always Listening)</option>
-                        <option value="push-to-talk">Push-to-Talk (Hotkey Activated)</option>
-                    </select>
-                    <div class="form-description">
-                        ${pushToTalkDisabled
-                            ? 'Push-to-Talk is available only with the OpenAI SDK provider.'
-                            : this.audioInputMode === 'auto'
-                              ? 'Audio is continuously recorded and transcribed when silence is detected.'
-                              : 'Audio recording starts when you press and hold/toggle the hotkey.'}
-                    </div>
-                </div>
-                ${this.audioInputMode === 'push-to-talk'
-                    ? html`<div class="form-description">Use the Push-to-Talk hotkey (toggle) to start/stop recording.</div>`
-                    : ''}
+            <input
+              class="slider-input"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              .value=${this.backgroundTransparency}
+              @input=${this.handleBackgroundTransparencyChange}
+            />
+          </div>
+          <div class="form-group slider-wrap">
+            <div class="slider-header">
+              <label class="form-label">Response Font Size</label>
+              <span class="slider-value">${this.fontSize}px</span>
             </div>
-        `;
-    }
+            <input
+              class="slider-input"
+              type="range"
+              min="12"
+              max="32"
+              step="1"
+              .value=${this.fontSize}
+              @input=${this.handleFontSizeChange}
+            />
+          </div>
+        </div>
+      </section>
+    `;
+  }
 
-    renderLanguageSection() {
-        const languages = this.getLanguages();
-        const currentLanguage = languages.find(l => l.value === this.selectedLanguage);
-
-        return html`
-            <div class="content-header">Language</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">
-                        Speech Language
-                        <span class="current-selection">${currentLanguage?.name || 'Unknown'}</span>
-                    </label>
-                    <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
-                        ${languages.map(
-                            language => html`
-                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>${language.name}</option>
-                            `
-                        )}
-                    </select>
-                    <div class="form-description">Language for speech recognition and AI responses</div>
-                </div>
+  renderKeyboardSection() {
+    return html`
+      <section class="surface">
+        <div class="surface-title">Keyboard Shortcuts</div>
+        ${this.getKeybindActions().map(
+          (action) => html`
+            <div class="keybind-row">
+              <span class="keybind-name">${action.name}</span>
+              <input
+                type="text"
+                class="control keybind-input"
+                .value=${this.keybinds[action.key]}
+                data-action=${action.key}
+                @keydown=${this.handleKeybindInput}
+                @focus=${this.handleKeybindFocus}
+                readonly
+              />
             </div>
-        `;
-    }
+          `,
+        )}
+        <div style="margin-top: var(--space-sm);">
+          <button
+            class="control"
+            style="width:auto;padding:8px 10px;"
+            @click=${this.resetKeybinds}
+          >
+            Reset to defaults
+          </button>
+        </div>
+      </section>
+    `;
+  }
 
-    renderAppearanceSection() {
-        const themes = this.getThemes();
-        const currentTheme = themes.find(t => t.value === this.theme);
+  renderPrivacySection() {
+    return html`
+      <section class="surface danger-surface">
+        <div class="surface-title danger">Privacy and Data</div>
+        <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
+          <button
+            class="danger-button"
+            @click=${this.restoreAllSettings}
+            ?disabled=${this.isRestoring}
+          >
+            ${this.isRestoring ? "Restoring..." : "Restore all settings"}
+          </button>
+          <button
+            class="danger-button"
+            @click=${this.clearLocalData}
+            ?disabled=${this.isClearing}
+          >
+            ${this.isClearing ? "Clearing..." : "Delete all data"}
+          </button>
+        </div>
+        ${this.clearStatusMessage
+          ? html`
+              <div
+                class="status ${this.clearStatusType === "success"
+                  ? "success"
+                  : "error"}"
+              >
+                ${this.clearStatusMessage}
+              </div>
+            `
+          : ""}
+      </section>
+    `;
+  }
 
-        return html`
-            <div class="content-header">Appearance</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">
-                        Theme
-                        <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
-                    </label>
-                    <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
-                        ${themes.map(theme => html` <option value=${theme.value} ?selected=${this.theme === theme.value}>${theme.name}</option> `)}
-                    </select>
-                    <div class="form-description">Choose a color theme for the interface</div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">
-                        Layout Mode
-                        <span class="current-selection">${this.layoutMode === 'compact' ? 'Compact' : 'Normal'}</span>
-                    </label>
-                    <select class="form-control" .value=${this.layoutMode} @change=${this.handleLayoutModeSelect}>
-                        <option value="normal" ?selected=${this.layoutMode === 'normal'}>Normal</option>
-                        <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
-                    </select>
-                    <div class="form-description">
-                        ${this.layoutMode === 'compact' ? 'Smaller window with reduced padding' : 'Standard layout with comfortable spacing'}
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="slider-container">
-                        <div class="slider-header">
-                            <label class="form-label">Background Transparency</label>
-                            <span class="slider-value">${Math.round(this.backgroundTransparency * 100)}%</span>
-                        </div>
-                        <input
-                            type="range"
-                            class="slider-input"
-                            min="0"
-                            max="1"
-                            step="0.01"
-                            .value=${this.backgroundTransparency}
-                            @input=${this.handleBackgroundTransparencyChange}
-                        />
-                        <div class="slider-labels">
-                            <span>Transparent</span>
-                            <span>Opaque</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="slider-container">
-                        <div class="slider-header">
-                            <label class="form-label">Response Font Size</label>
-                            <span class="slider-value">${this.fontSize}px</span>
-                        </div>
-                        <input
-                            type="range"
-                            class="slider-input"
-                            min="12"
-                            max="32"
-                            step="1"
-                            .value=${this.fontSize}
-                            @input=${this.handleFontSizeChange}
-                        />
-                        <div class="slider-labels">
-                            <span>12px</span>
-                            <span>32px</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderCaptureSection() {
-        return html`
-            <div class="content-header">Screen Capture</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">
-                        Image Quality
-                        <span class="current-selection"
-                            >${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span
-                        >
-                    </label>
-                    <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
-                        <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
-                        <option value="medium" ?selected=${this.selectedImageQuality === 'medium'}>Medium Quality</option>
-                        <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
-                    </select>
-                    <div class="form-description">
-                        ${this.selectedImageQuality === 'high'
-                            ? 'Best quality, uses more tokens'
-                            : this.selectedImageQuality === 'medium'
-                              ? 'Balanced quality and token usage'
-                              : 'Lower quality, uses fewer tokens'}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    renderKeyboardSection() {
-        return html`
-            <div class="content-header">Keyboard Shortcuts</div>
-            <div class="form-grid">
-                <table class="keybinds-table">
-                    <thead>
-                        <tr>
-                            <th>Action</th>
-                            <th>Shortcut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.getKeybindActions().map(
-                            action => html`
-                                <tr>
-                                    <td>
-                                        <div class="action-name">${action.name}</div>
-                                        <div class="action-description">${action.description}</div>
-                                    </td>
-                                    <td>
-                                        <input
-                                            type="text"
-                                            class="form-control keybind-input"
-                                            .value=${this.keybinds[action.key]}
-                                            placeholder="Press keys..."
-                                            data-action=${action.key}
-                                            @keydown=${this.handleKeybindInput}
-                                            @focus=${this.handleKeybindFocus}
-                                            readonly
-                                        />
-                                    </td>
-                                </tr>
-                            `
-                        )}
-                        <tr class="table-reset-row">
-                            <td colspan="2">
-                                <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        `;
-    }
-
-    renderAIProviderSection() {
-        const providerNames = {
-            gemini: 'Google Gemini',
-            'openai-realtime': 'OpenAI Realtime',
-            'openai-sdk': 'OpenAI SDK (BotHub, etc.)',
-        };
-
-        return html`
-            <div class="content-header">AI Provider</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label">
-                        Provider
-                        <span class="current-selection">${providerNames[this.aiProvider] || 'Google Gemini'}</span>
-                    </label>
-                    <select class="form-control" .value=${this.aiProvider} @change=${this.handleAIProviderChange}>
-                        <option value="gemini" ?selected=${this.aiProvider === 'gemini'}>Google Gemini (Live Audio)</option>
-                        <option value="openai-realtime" ?selected=${this.aiProvider === 'openai-realtime'}>OpenAI Realtime API</option>
-                        <option value="openai-sdk" ?selected=${this.aiProvider === 'openai-sdk'}>OpenAI SDK (BotHub, Azure, etc.)</option>
-                    </select>
-                    <div class="form-description">Choose which AI provider to use for conversations and screen analysis</div>
-                </div>
-
-                ${this.aiProvider === 'gemini'
-                    ? html`
-                          <div class="form-group full-width">
-                              <label class="form-label">Gemini API Key</label>
-                              <input
-                                  type="password"
-                                  class="form-control"
-                                  placeholder="Enter your Gemini API key"
-                                  .value=${this.geminiApiKey}
-                                  @input=${this.handleGeminiApiKeyInput}
-                              />
-                              <div class="form-description">
-                                  Get your API key from
-                                  <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--text-color);"
-                                      >Google AI Studio</a
-                                  >
-                              </div>
-                          </div>
-                      `
-                    : this.aiProvider === 'openai-realtime'
-                      ? html`
-                            <div class="form-group full-width">
-                                <label class="form-label">OpenAI API Key</label>
-                                <input
-                                    type="password"
-                                    class="form-control"
-                                    placeholder="Enter your OpenAI API key"
-                                    .value=${this.openaiApiKey}
-                                    @input=${this.handleOpenAIApiKeyInput}
-                                />
-                                <div class="form-description">
-                                    Get your API key from
-                                    <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--text-color);"
-                                        >OpenAI Platform</a
-                                    >
-                                </div>
-                            </div>
-
-                            <div class="form-group full-width">
-                                <label class="form-label">Base URL (Optional)</label>
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    placeholder="wss://api.openai.com/v1/realtime (leave empty for default)"
-                                    .value=${this.openaiBaseUrl}
-                                    @input=${this.handleOpenAIBaseUrlInput}
-                                />
-                                <div class="form-description">Override the base URL for OpenAI-compatible APIs</div>
-                            </div>
-
-                            <div class="form-group full-width">
-                                <label class="form-label">Model</label>
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    placeholder="gpt-4o-realtime-preview-2024-12-17"
-                                    .value=${this.openaiModel}
-                                    @input=${this.handleOpenAIModelInput}
-                                />
-                                <div class="form-description">Realtime API model to use</div>
-                            </div>
-                        `
-                      : html`
-                            <div class="form-group full-width">
-                                <label class="form-label">API Key</label>
-                                <input
-                                    type="password"
-                                    class="form-control"
-                                    placeholder="Enter your API key"
-                                    .value=${this.openaiSdkApiKey}
-                                    @input=${this.handleOpenAISdkApiKeyInput}
-                                />
-                                <div class="form-description">API key for your provider (BotHub, Azure, OpenRouter, etc.)</div>
-                            </div>
-
-                            <div class="form-group full-width">
-                                <label class="form-label">Base URL</label>
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    placeholder="https://bothub.chat/api/v2/openai/v1"
-                                    .value=${this.openaiSdkBaseUrl}
-                                    @input=${this.handleOpenAISdkBaseUrlInput}
-                                />
-                                <div class="form-description">API endpoint URL (e.g., https://bothub.chat/api/v2/openai/v1)</div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Chat Model</label>
-                                    <input
-                                        type="text"
-                                        class="form-control"
-                                        placeholder="gpt-4o"
-                                        .value=${this.openaiSdkModel}
-                                        @input=${this.handleOpenAISdkModelInput}
-                                    />
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Vision Model</label>
-                                    <input
-                                        type="text"
-                                        class="form-control"
-                                        placeholder="gpt-4o"
-                                        .value=${this.openaiSdkVisionModel}
-                                        @input=${this.handleOpenAISdkVisionModelInput}
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="form-group full-width">
-                                <label class="form-label">Whisper Model (Transcription)</label>
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    placeholder="whisper-1"
-                                    .value=${this.openaiSdkWhisperModel}
-                                    @input=${this.handleOpenAISdkWhisperModelInput}
-                                />
-                                <div class="form-description">Model for audio transcription</div>
-                            </div>
-                        `}
-
-                <div
-                    class="form-description full-width"
-                    style="margin-top: 12px; padding: 12px; background: var(--bg-secondary); border-left: 2px solid var(--border-default); border-radius: 3px;"
-                >
-                    <strong>Note:</strong> You must restart the AI session for provider changes to take effect.
-                </div>
-            </div>
-        `;
-    }
-
-    renderSearchSection() {
-        return html`
-            <div class="content-header">Search</div>
-            <div class="form-grid">
-                <div class="checkbox-group">
-                    <input
-                        type="checkbox"
-                        class="checkbox-input"
-                        id="google-search-enabled"
-                        .checked=${this.googleSearchEnabled}
-                        @change=${this.handleGoogleSearchChange}
-                    />
-                    <label for="google-search-enabled" class="checkbox-label">Enable Google Search</label>
-                </div>
-                <div class="form-description" style="margin-left: 24px; margin-top: -8px;">
-                    Allow the AI to search Google for up-to-date information during conversations.
-                    <br /><strong>Note:</strong> Changes take effect when starting a new AI session.
-                </div>
-            </div>
-        `;
-    }
-
-    renderAdvancedSection() {
-        return html`
-            <div class="content-header" style="color: var(--error-color);">Advanced</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label class="form-label" style="color: var(--error-color);">Data Management</label>
-                    <div class="form-description" style="margin-bottom: 12px;">
-                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session
-                        history. This cannot be undone.
-                    </div>
-                    <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
-                        ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
-                    </button>
-                    ${this.clearStatusMessage
-                        ? html`
-                              <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
-                                  ${this.clearStatusMessage}
-                              </div>
-                          `
-                        : ''}
-                </div>
-            </div>
-        `;
-    }
-
-    renderSectionContent() {
-        switch (this.activeSection) {
-            case 'profile':
-                return this.renderProfileSection();
-            case 'ai-provider':
-                return this.renderAIProviderSection();
-            case 'appearance':
-                return this.renderAppearanceSection();
-            case 'audio':
-                return this.renderAudioSection();
-            case 'language':
-                return this.renderLanguageSection();
-            case 'capture':
-                return this.renderCaptureSection();
-            case 'keyboard':
-                return this.renderKeyboardSection();
-            case 'search':
-                return this.renderSearchSection();
-            case 'advanced':
-                return this.renderAdvancedSection();
-            default:
-                return this.renderProfileSection();
-        }
-    }
-
-    render() {
-        const sections = this.getSidebarSections();
-
-        return html`
-            <div class="settings-layout">
-                <nav class="settings-sidebar">
-                    ${sections.map(
-                        section => html`
-                            <button
-                                class="sidebar-item ${this.activeSection === section.id ? 'active' : ''} ${section.danger ? 'danger' : ''}"
-                                @click=${() => this.setActiveSection(section.id)}
-                            >
-                                ${this.renderSidebarIcon(section.icon)}
-                                <span>${section.name}</span>
-                            </button>
-                        `
-                    )}
-                </nav>
-                <div class="settings-content">${this.renderSectionContent()}</div>
-            </div>
-        `;
-    }
+  render() {
+    return html`
+      <div class="unified-page">
+        <div class="unified-wrap">
+          <div class="page-title">Settings</div>
+          ${this.renderAISection()} ${this.renderAudioSection()}
+          ${this.renderLanguageSection()} ${this.renderAppearanceSection()}
+          ${this.renderKeyboardSection()} ${this.renderPrivacySection()}
+        </div>
+      </div>
+    `;
+  }
 }
 
-customElements.define('customize-view', CustomizeView);
+customElements.define("customize-view", CustomizeView);

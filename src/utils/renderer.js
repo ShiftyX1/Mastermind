@@ -1,5 +1,5 @@
 // renderer.js
-const { ipcRenderer } = require('electron');
+const { ipcRenderer } = require("electron");
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -14,1430 +14,1190 @@ const BUFFER_SIZE = 4096; // Increased buffer size for smoother audio
 let hiddenVideo = null;
 let offscreenCanvas = null;
 let offscreenContext = null;
-let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
+let currentImageQuality = "medium"; // Store current image quality for manual screenshots
 
-const isLinux = process.platform === 'linux';
-const isMacOS = process.platform === 'darwin';
-const isWindows = process.platform === 'win32';
-
-// Send logs to main process for file logging
-function logToMain(level, ...args) {
-    const message = args
-        .map(arg => {
-            if (typeof arg === 'object') {
-                try {
-                    return JSON.stringify(arg);
-                } catch {
-                    return String(arg);
-                }
-            }
-            return String(arg);
-        })
-        .join(' ');
-    ipcRenderer.send('renderer-log', { level, message });
-
-    // Also log to console
-    if (level === 'error') console.error(...args);
-    else if (level === 'warn') console.warn(...args);
-    else console.log(...args);
-}
+const isLinux = process.platform === "linux";
+const isMacOS = process.platform === "darwin";
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access
 const storage = {
-    // Config
-    async getConfig() {
-        const result = await ipcRenderer.invoke('storage:get-config');
-        return result.success ? result.data : {};
-    },
-    async setConfig(config) {
-        return ipcRenderer.invoke('storage:set-config', config);
-    },
-    async updateConfig(key, value) {
-        return ipcRenderer.invoke('storage:update-config', key, value);
-    },
+  // Config
+  async getConfig() {
+    const result = await ipcRenderer.invoke("storage:get-config");
+    return result.success ? result.data : {};
+  },
+  async setConfig(config) {
+    return ipcRenderer.invoke("storage:set-config", config);
+  },
+  async updateConfig(key, value) {
+    return ipcRenderer.invoke("storage:update-config", key, value);
+  },
 
-    // Credentials
-    async getCredentials() {
-        const result = await ipcRenderer.invoke('storage:get-credentials');
-        return result.success ? result.data : {};
-    },
-    async setCredentials(credentials) {
-        return ipcRenderer.invoke('storage:set-credentials', credentials);
-    },
-    async getApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-api-key');
-        return result.success ? result.data : '';
-    },
-    async setApiKey(apiKey) {
-        return ipcRenderer.invoke('storage:set-api-key', apiKey);
-    },
-    async getOpenAICredentials() {
-        const result = await ipcRenderer.invoke('storage:get-openai-credentials');
-        return result.success ? result.data : {};
-    },
-    async setOpenAICredentials(config) {
-        return ipcRenderer.invoke('storage:set-openai-credentials', config);
-    },
-    async getOpenAISDKCredentials() {
-        const result = await ipcRenderer.invoke('storage:get-openai-sdk-credentials');
-        return result.success ? result.data : {};
-    },
-    async setOpenAISDKCredentials(config) {
-        return ipcRenderer.invoke('storage:set-openai-sdk-credentials', config);
-    },
+  // Credentials
+  async getCredentials() {
+    const result = await ipcRenderer.invoke("storage:get-credentials");
+    return result.success ? result.data : {};
+  },
+  async setCredentials(credentials) {
+    return ipcRenderer.invoke("storage:set-credentials", credentials);
+  },
+  async getApiKey() {
+    const result = await ipcRenderer.invoke("storage:get-api-key");
+    return result.success ? result.data : "";
+  },
+  async setApiKey(apiKey) {
+    return ipcRenderer.invoke("storage:set-api-key", apiKey);
+  },
+  async getGroqApiKey() {
+    const result = await ipcRenderer.invoke("storage:get-groq-api-key");
+    return result.success ? result.data : "";
+  },
+  async setGroqApiKey(groqApiKey) {
+    return ipcRenderer.invoke("storage:set-groq-api-key", groqApiKey);
+  },
+  async getOpenAICompatibleConfig() {
+    const result = await ipcRenderer.invoke("get-openai-compatible-config");
+    return result.success
+      ? result.config
+      : { apiKey: "", baseUrl: "", model: "" };
+  },
+  async setOpenAICompatibleConfig(apiKey, baseUrl, model) {
+    return ipcRenderer.invoke(
+      "set-openai-compatible-config",
+      apiKey,
+      baseUrl,
+      model,
+    );
+  },
 
-    // Preferences
-    async getPreferences() {
-        const result = await ipcRenderer.invoke('storage:get-preferences');
-        return result.success ? result.data : {};
-    },
-    async setPreferences(preferences) {
-        return ipcRenderer.invoke('storage:set-preferences', preferences);
-    },
-    async updatePreference(key, value) {
-        return ipcRenderer.invoke('storage:update-preference', key, value);
-    },
+  // Preferences
+  async getPreferences() {
+    const result = await ipcRenderer.invoke("storage:get-preferences");
+    return result.success ? result.data : {};
+  },
+  async setPreferences(preferences) {
+    return ipcRenderer.invoke("storage:set-preferences", preferences);
+  },
+  async updatePreference(key, value) {
+    return ipcRenderer.invoke("storage:update-preference", key, value);
+  },
 
-    // Keybinds
-    async getKeybinds() {
-        const result = await ipcRenderer.invoke('storage:get-keybinds');
-        return result.success ? result.data : null;
-    },
-    async setKeybinds(keybinds) {
-        return ipcRenderer.invoke('storage:set-keybinds', keybinds);
-    },
+  // Keybinds
+  async getKeybinds() {
+    const result = await ipcRenderer.invoke("storage:get-keybinds");
+    return result.success ? result.data : null;
+  },
+  async setKeybinds(keybinds) {
+    return ipcRenderer.invoke("storage:set-keybinds", keybinds);
+  },
 
-    // Sessions (History)
-    async getAllSessions() {
-        const result = await ipcRenderer.invoke('storage:get-all-sessions');
-        return result.success ? result.data : [];
-    },
-    async getSession(sessionId) {
-        const result = await ipcRenderer.invoke('storage:get-session', sessionId);
-        return result.success ? result.data : null;
-    },
-    async saveSession(sessionId, data) {
-        return ipcRenderer.invoke('storage:save-session', sessionId, data);
-    },
-    async deleteSession(sessionId) {
-        return ipcRenderer.invoke('storage:delete-session', sessionId);
-    },
-    async deleteAllSessions() {
-        return ipcRenderer.invoke('storage:delete-all-sessions');
-    },
+  // Sessions (History)
+  async getAllSessions() {
+    const result = await ipcRenderer.invoke("storage:get-all-sessions");
+    return result.success ? result.data : [];
+  },
+  async getSession(sessionId) {
+    const result = await ipcRenderer.invoke("storage:get-session", sessionId);
+    return result.success ? result.data : null;
+  },
+  async saveSession(sessionId, data) {
+    return ipcRenderer.invoke("storage:save-session", sessionId, data);
+  },
+  async deleteSession(sessionId) {
+    return ipcRenderer.invoke("storage:delete-session", sessionId);
+  },
+  async deleteAllSessions() {
+    return ipcRenderer.invoke("storage:delete-all-sessions");
+  },
 
-    // Clear all
-    async clearAll() {
-        return ipcRenderer.invoke('storage:clear-all');
-    },
+  // Clear all
+  async clearAll() {
+    return ipcRenderer.invoke("storage:clear-all");
+  },
 
-    // Limits
-    async getTodayLimits() {
-        const result = await ipcRenderer.invoke('storage:get-today-limits');
-        return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
-    },
-
-    // Migration
-    hasOldConfig() {
-        // Note: This is synchronous in the main process, but we need to use invoke which is async
-        // So we'll make this return a promise
-        return ipcRenderer.invoke('storage:has-old-config').then(result => (result.success ? result.data : false));
-    },
-    async migrateFromOldConfig() {
-        const result = await ipcRenderer.invoke('storage:migrate-from-old-config');
-        return result.success ? result.data : false;
-    },
+  // Limits
+  async getTodayLimits() {
+    const result = await ipcRenderer.invoke("storage:get-today-limits");
+    return result.success
+      ? result.data
+      : { flash: { count: 0 }, flashLite: { count: 0 } };
+  },
 };
 
 // Cache for preferences to avoid async calls in hot paths
 let preferencesCache = null;
 
 async function loadPreferencesCache() {
-    preferencesCache = await storage.getPreferences();
-    return preferencesCache;
+  preferencesCache = await storage.getPreferences();
+  return preferencesCache;
 }
 
 // Initialize preferences cache
 loadPreferencesCache();
 
 function convertFloat32ToInt16(float32Array) {
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-        // Improved scaling to prevent clipping
-        const s = Math.max(-1, Math.min(1, float32Array[i]));
-        int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
-    return int16Array;
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    // Improved scaling to prevent clipping
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return int16Array;
 }
 
 function arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
-async function initializeGemini(profile = 'interview', language = 'en-US') {
+async function initializeGemini(profile = "interview", language = "en-US") {
+  const apiKey = await storage.getApiKey();
+  if (apiKey) {
     const prefs = await storage.getPreferences();
-    const success = await ipcRenderer.invoke('initialize-ai-session', prefs.customPrompt || '', profile, language);
+    const success = await ipcRenderer.invoke(
+      "initialize-gemini",
+      apiKey,
+      prefs.customPrompt || "",
+      profile,
+      language,
+    );
     if (success) {
-        mastermind.setStatus('Live');
+      cheatingDaddy.setStatus("Live");
     } else {
-        mastermind.setStatus('Error: Failed to initialize AI session Gemini');
+      cheatingDaddy.setStatus("error");
     }
+  }
+}
+
+async function initializeLocal(profile = "interview") {
+  const prefs = await storage.getPreferences();
+  const ollamaHost = prefs.ollamaHost || "http://127.0.0.1:11434";
+  const ollamaModel = prefs.ollamaModel || "llama3.1";
+  const whisperModel = prefs.whisperModel || "Xenova/whisper-small";
+  const customPrompt = prefs.customPrompt || "";
+
+  const success = await ipcRenderer.invoke(
+    "initialize-local",
+    ollamaHost,
+    ollamaModel,
+    whisperModel,
+    profile,
+    customPrompt,
+  );
+  if (success) {
+    cheatingDaddy.setStatus("Local AI Live");
+    return true;
+  } else {
+    cheatingDaddy.setStatus("error");
+    return false;
+  }
 }
 
 // Listen for status updates
-ipcRenderer.on('update-status', (event, status) => {
-    console.log('Status update:', status);
-    mastermind.setStatus(status);
+ipcRenderer.on("update-status", (event, status) => {
+  console.log("Status update:", status);
+  cheatingDaddy.setStatus(status);
 });
 
-ipcRenderer.on('push-to-talk-toggle', () => {
-    ipcRenderer.send('push-to-talk-toggle');
-});
+async function startCapture(
+  screenshotIntervalSeconds = 5,
+  imageQuality = "medium",
+) {
+  // Store the image quality for manual screenshots
+  currentImageQuality = imageQuality;
 
-/**
- * Checks screen capture permission status on macOS
- * @returns {Promise<boolean>} true if permission is granted
- */
-async function checkMacOSScreenCapturePermission() {
-    if (!isMacOS) {
-        console.log('[Permission Check] Not macOS, skipping');
-        return true;
-    }
+  // Refresh preferences cache
+  await loadPreferencesCache();
+  const audioMode = preferencesCache.audioMode || "speaker_only";
 
-    try {
-        console.log('[Permission Check] Checking screen capture permission on macOS...');
-        const result = await ipcRenderer.invoke('check-screen-capture-permission');
-        console.log('[Permission Check] Result:', result);
-        if (!result.granted) {
-            console.warn('[Permission Check] Screen capture permission not granted:', result.status);
-            logToMain('warn', 'Screen capture permission check:', result);
-        } else {
-            console.log('[Permission Check] Screen capture permission granted');
-        }
-        return result.granted;
-    } catch (error) {
-        console.error('[Permission Check] Error checking permission:', error);
-        logToMain('error', 'Permission check error:', error);
-        return false;
-    }
-}
+  try {
+    if (isMacOS) {
+      // On macOS, use SystemAudioDump for audio and getDisplayMedia for screen
+      console.log("Starting macOS capture with SystemAudioDump...");
 
-/**
- * Wrapper for getDisplayMedia with timeout and retries
- * @param {object} constraints - Media constraints
- * @param {number} timeout - Timeout in milliseconds (default 30 seconds)
- * @param {number} retries - Number of retry attempts (default 1)
- * @returns {Promise<MediaStream>}
- */
-async function getDisplayMediaWithTimeout(constraints, timeout = 30000, retries = 1) {
-    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+      // Start macOS audio capture
+      const audioResult = await ipcRenderer.invoke("start-macos-audio");
+      if (!audioResult.success) {
+        throw new Error(
+          "Failed to start macOS audio capture: " + audioResult.error,
+        );
+      }
+
+      // Get screen capture for screenshots
+      mediaStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: 1,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false, // Don't use browser audio on macOS
+      });
+
+      console.log(
+        "macOS screen capture started - audio handled by SystemAudioDump",
+      );
+
+      if (audioMode === "mic_only" || audioMode === "both") {
+        let micStream = null;
         try {
-            console.log(`[Attempt ${attempt}/${retries + 1}] Requesting display media...`);
-            console.log('[getDisplayMedia] Constraints:', JSON.stringify(constraints));
-
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Display media request timed out')), timeout);
-            });
-
-            const mediaPromise = navigator.mediaDevices.getDisplayMedia(constraints);
-
-            const stream = await Promise.race([mediaPromise, timeoutPromise]);
-
-            console.log('Display media obtained successfully');
-            console.log(
-                'Stream tracks:',
-                stream.getTracks().map(t => ({ kind: t.kind, label: t.label, enabled: t.enabled }))
-            );
-            return stream;
-        } catch (error) {
-            console.error(`[Attempt ${attempt}/${retries + 1}] Error type:`, error.constructor.name);
-            console.error(`[Attempt ${attempt}/${retries + 1}] Error message:`, error.message);
-            console.error(`[Attempt ${attempt}/${retries + 1}] Error name:`, error.name);
-            console.error(`[Attempt ${attempt}/${retries + 1}] Full error:`, error);
-            console.error(`[Attempt ${attempt}/${retries + 1}] Error stack:`, error.stack);
-
-            if (attempt <= retries) {
-                console.log(`Retrying in 2 seconds...`);
-                const errorMsg = error.message || error.name || 'Unknown error';
-                mastermind?.setStatus(`Error: ${errorMsg}. Retrying...`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            } else {
-                throw error;
-            }
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              sampleRate: SAMPLE_RATE,
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+          console.log("macOS microphone capture started");
+          setupLinuxMicProcessing(micStream);
+        } catch (micError) {
+          console.warn("Failed to get microphone access on macOS:", micError);
         }
-    }
-}
-
-async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'medium') {
-    // Store the image quality for manual screenshots
-    currentImageQuality = imageQuality;
-
-    // Refresh preferences cache
-    await loadPreferencesCache();
-    const audioMode = preferencesCache.audioMode || 'speaker_only';
-
-    try {
-        // Pre-flight check for macOS
-        if (isMacOS) {
-            mastermind.setStatus('Checking permissions...');
-            const hasPermission = await checkMacOSScreenCapturePermission();
-            if (!hasPermission) {
-                throw new Error('Screen recording permission not granted. Please enable in System Settings.');
-            }
-        }
-
-        if (isMacOS) {
-            // On macOS, use SystemAudioDump for audio and custom picker for screen
-            console.log('Starting macOS capture with SystemAudioDump...');
-            mastermind.setStatus('Choose screen to share...');
-
-            // Show screen picker dialog (like Windows)
-            const appElement = document.querySelector('mastermind-app');
-            const pickerResult = await appElement.showScreenPickerDialog();
-
-            if (pickerResult.cancelled) {
-                mastermind.setStatus('Cancelled');
-                return;
-            }
-
-            mastermind.setStatus('Starting capture...');
-
-            // Start macOS audio capture
-            const audioResult = await ipcRenderer.invoke('start-macos-audio');
-            if (!audioResult.success) {
-                throw new Error('Failed to start macOS audio capture: ' + audioResult.error);
-            }
-
-            // Get screen capture for screenshots - use wrapper with timeout
-            mediaStream = await getDisplayMediaWithTimeout(
-                {
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: false, // Don't use browser audio on macOS
-                },
-                45000,
-                2
-            ); // 45 seconds timeout, 2 retry attempts
-
-            console.log('macOS screen capture started - audio handled by SystemAudioDump');
-
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-                    console.log('macOS microphone capture started');
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on macOS:', micError);
-                }
-            }
-        } else if (isLinux) {
-            // Linux - use display media for screen capture and try to get system audio
-            try {
-                // First try to get system audio via getDisplayMedia (works on newer browsers)
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: {
-                        sampleRate: SAMPLE_RATE,
-                        channelCount: 1,
-                        echoCancellation: false, // Don't cancel system audio
-                        noiseSuppression: false,
-                        autoGainControl: false,
-                    },
-                });
-
-                console.log('Linux system audio capture via getDisplayMedia succeeded');
-
-                // Setup audio processing for Linux system audio
-                setupLinuxSystemAudioProcessing();
-            } catch (systemAudioError) {
-                console.warn('System audio via getDisplayMedia failed, trying screen-only capture:', systemAudioError);
-
-                // Fallback to screen-only capture
-                mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        frameRate: 1,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: false,
-                });
-            }
-
-            // Additionally get microphone input for Linux based on audio mode
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-
-                    console.log('Linux microphone capture started');
-
-                    // Setup audio processing for microphone on Linux
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on Linux:', micError);
-                    // Continue without microphone if permission denied
-                }
-            }
-
-            console.log('Linux capture started - system audio:', mediaStream.getAudioTracks().length > 0, 'microphone mode:', audioMode);
-        } else {
-            // Windows - show custom screen picker first
-            logToMain('info', '=== Starting Windows audio capture ===');
-            mastermind.setStatus('Choose screen to share...');
-
-            // Show screen picker dialog
-            const appElement = document.querySelector('mastermind-app');
-            const pickerResult = await appElement.showScreenPickerDialog();
-
-            if (pickerResult.cancelled) {
-                mastermind.setStatus('Cancelled');
-                return;
-            }
-
-            mastermind.setStatus('Starting capture...');
-
-            mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    frameRate: 1,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
-            });
-
-            const audioTracks = mediaStream.getAudioTracks();
-            const videoTracks = mediaStream.getVideoTracks();
-
-            logToMain('info', 'Windows capture result:', {
-                hasVideo: videoTracks.length > 0,
-                hasAudio: audioTracks.length > 0,
-                audioTrackInfo: audioTracks.map(t => ({
-                    label: t.label,
-                    enabled: t.enabled,
-                    muted: t.muted,
-                    readyState: t.readyState,
-                    settings: t.getSettings(),
-                })),
-            });
-
-            if (audioTracks.length === 0) {
-                logToMain('warn', 'WARNING: No audio tracks! User must check "Share audio" in screen picker dialog');
-                mastermind.setStatus('Warning: No audio - enable "Share audio" checkbox');
-            } else {
-                logToMain('info', 'Audio track acquired, setting up processing...');
-                // Setup audio processing for Windows loopback audio only
-                setupWindowsLoopbackProcessing();
-            }
-
-            if (audioMode === 'mic_only' || audioMode === 'both') {
-                let micStream = null;
-                try {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: SAMPLE_RATE,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true,
-                        },
-                        video: false,
-                    });
-                    console.log('Windows microphone capture started');
-                    setupLinuxMicProcessing(micStream);
-                } catch (micError) {
-                    console.warn('Failed to get microphone access on Windows:', micError);
-                }
-            }
-        }
-
-        console.log('MediaStream obtained:', {
-            hasVideo: mediaStream.getVideoTracks().length > 0,
-            hasAudio: mediaStream.getAudioTracks().length > 0,
-            videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
+      }
+    } else if (isLinux) {
+      // Linux - use display media for screen capture and try to get system audio
+      try {
+        // First try to get system audio via getDisplayMedia (works on newer browsers)
+        mediaStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: 1,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: {
+            sampleRate: SAMPLE_RATE,
+            channelCount: 1,
+            echoCancellation: false, // Don't cancel system audio
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
         });
 
-        // Manual mode only - screenshots captured on demand via shortcut
-        console.log('Manual mode enabled - screenshots will be captured on demand only');
-    } catch (err) {
-        console.error('Error starting capture - Type:', err.constructor.name);
-        console.error('Error starting capture - Message:', err.message);
-        console.error('Error starting capture - Name:', err.name);
-        console.error('Error starting capture - Full:', err);
-        console.error('Error starting capture - Stack:', err.stack);
-        console.error('Error starting capture - Keys:', Object.keys(err));
-        logToMain('error', 'Capture error:', {
-            type: err.constructor.name,
-            message: err.message,
-            name: err.name,
-            stack: err.stack,
+        console.log("Linux system audio capture via getDisplayMedia succeeded");
+
+        // Setup audio processing for Linux system audio
+        setupLinuxSystemAudioProcessing();
+      } catch (systemAudioError) {
+        console.warn(
+          "System audio via getDisplayMedia failed, trying screen-only capture:",
+          systemAudioError,
+        );
+
+        // Fallback to screen-only capture
+        mediaStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: 1,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
         });
+      }
 
-        // Provide more helpful error messages based on error type
-        let errorMessage = err.message || err.name || 'Failed to start capture';
+      // Additionally get microphone input for Linux based on audio mode
+      if (audioMode === "mic_only" || audioMode === "both") {
+        let micStream = null;
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              sampleRate: SAMPLE_RATE,
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
 
-        if (errorMessage.toLowerCase().includes('timeout')) {
-            errorMessage =
-                'Screen capture timed out. This may be due to:\n' +
-                '• System permissions not granted\n' +
-                '• Screen Recording permission needs to be enabled in System Settings\n' +
-                '• System picker dialog was closed\n\n' +
-                'Please check System Settings > Privacy & Security > Screen Recording';
-        } else if (errorMessage.toLowerCase().includes('permission') || errorMessage.toLowerCase().includes('denied')) {
-            errorMessage =
-                'Screen capture permission denied.\n' +
-                'Please grant Screen Recording permission in:\n' +
-                'System Settings > Privacy & Security > Screen Recording';
-        } else if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('no sources')) {
-            errorMessage = 'No screen sources found. Please ensure a display is connected.';
-        } else if (errorMessage.toLowerCase().includes('aborted') || errorMessage.toLowerCase().includes('cancel')) {
-            errorMessage = 'Screen selection was cancelled. Click Start to try again.';
+          console.log("Linux microphone capture started");
+
+          // Setup audio processing for microphone on Linux
+          setupLinuxMicProcessing(micStream);
+        } catch (micError) {
+          console.warn("Failed to get microphone access on Linux:", micError);
+          // Continue without microphone if permission denied
         }
+      }
 
-        mastermind.setStatus('Error: ' + errorMessage);
+      console.log(
+        "Linux capture started - system audio:",
+        mediaStream.getAudioTracks().length > 0,
+        "microphone mode:",
+        audioMode,
+      );
+    } else {
+      // Windows - use display media with loopback for system audio
+      mediaStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: 1,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: {
+          sampleRate: SAMPLE_RATE,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
-        // Show retry button in UI
-        mastermind?.showRetryButton?.();
+      console.log("Windows capture started with loopback audio");
+
+      // Setup audio processing for Windows loopback audio only
+      setupWindowsLoopbackProcessing();
+
+      if (audioMode === "mic_only" || audioMode === "both") {
+        let micStream = null;
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              sampleRate: SAMPLE_RATE,
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+          console.log("Windows microphone capture started");
+          setupLinuxMicProcessing(micStream);
+        } catch (micError) {
+          console.warn("Failed to get microphone access on Windows:", micError);
+        }
+      }
     }
+
+    console.log("MediaStream obtained:", {
+      hasVideo: mediaStream.getVideoTracks().length > 0,
+      hasAudio: mediaStream.getAudioTracks().length > 0,
+      videoTrack: mediaStream.getVideoTracks()[0]?.getSettings(),
+    });
+
+    // Manual mode only - screenshots captured on demand via shortcut
+    console.log(
+      "Manual mode enabled - screenshots will be captured on demand only",
+    );
+  } catch (err) {
+    console.error("Error starting capture:", err);
+    cheatingDaddy.setStatus("error");
+  }
 }
 
 function setupLinuxMicProcessing(micStream) {
-    // Setup microphone audio processing for Linux
-    const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const micSource = micAudioContext.createMediaStreamSource(micStream);
-    const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+  // Setup microphone audio processing for Linux
+  const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+  const micSource = micAudioContext.createMediaStreamSource(micStream);
+  const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    let audioBuffer = [];
-    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+  let audioBuffer = [];
+  const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-    micProcessor.onaudioprocess = async e => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
+  micProcessor.onaudioprocess = async (e) => {
+    const inputData = e.inputBuffer.getChannelData(0);
+    audioBuffer.push(...inputData);
 
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+    // Process audio in chunks
+    while (audioBuffer.length >= samplesPerChunk) {
+      const chunk = audioBuffer.splice(0, samplesPerChunk);
+      const pcmData16 = convertFloat32ToInt16(chunk);
+      const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-mic-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
-        }
-    };
+      await ipcRenderer.invoke("send-mic-audio-content", {
+        data: base64Data,
+        mimeType: "audio/pcm;rate=24000",
+      });
+    }
+  };
 
-    micSource.connect(micProcessor);
-    micProcessor.connect(micAudioContext.destination);
+  micSource.connect(micProcessor);
+  micProcessor.connect(micAudioContext.destination);
 
-    // Store processor reference for cleanup
-    micAudioProcessor = micProcessor;
+  // Store processor reference for cleanup
+  micAudioProcessor = micProcessor;
 }
 
 function setupLinuxSystemAudioProcessing() {
-    // Setup system audio processing for Linux (from getDisplayMedia)
-    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const source = audioContext.createMediaStreamSource(mediaStream);
-    audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+  // Setup system audio processing for Linux (from getDisplayMedia)
+  audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+  const source = audioContext.createMediaStreamSource(mediaStream);
+  audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    let audioBuffer = [];
-    const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
+  let audioBuffer = [];
+  const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-    audioProcessor.onaudioprocess = async e => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
+  audioProcessor.onaudioprocess = async (e) => {
+    const inputData = e.inputBuffer.getChannelData(0);
+    audioBuffer.push(...inputData);
 
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
-            const pcmData16 = convertFloat32ToInt16(chunk);
-            const base64Data = arrayBufferToBase64(pcmData16.buffer);
+    // Process audio in chunks
+    while (audioBuffer.length >= samplesPerChunk) {
+      const chunk = audioBuffer.splice(0, samplesPerChunk);
+      const pcmData16 = convertFloat32ToInt16(chunk);
+      const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
-                data: base64Data,
-                mimeType: 'audio/pcm;rate=24000',
-            });
-        }
-    };
+      await ipcRenderer.invoke("send-audio-content", {
+        data: base64Data,
+        mimeType: "audio/pcm;rate=24000",
+      });
+    }
+  };
 
-    source.connect(audioProcessor);
-    audioProcessor.connect(audioContext.destination);
+  source.connect(audioProcessor);
+  audioProcessor.connect(audioContext.destination);
 }
 
 function setupWindowsLoopbackProcessing() {
-    // Setup audio processing for Windows loopback audio only
-    logToMain('info', 'Setting up Windows loopback audio processing...');
+  // Setup audio processing for Windows loopback audio only
+  audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+  const source = audioContext.createMediaStreamSource(mediaStream);
+  audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    try {
-        audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+  let audioBuffer = [];
+  const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-        logToMain('info', 'AudioContext created:', {
-            state: audioContext.state,
-            sampleRate: audioContext.sampleRate,
-        });
+  audioProcessor.onaudioprocess = async (e) => {
+    const inputData = e.inputBuffer.getChannelData(0);
+    audioBuffer.push(...inputData);
 
-        // Resume AudioContext if suspended (Chrome policy)
-        if (audioContext.state === 'suspended') {
-            logToMain('warn', 'AudioContext suspended, attempting resume...');
-            audioContext
-                .resume()
-                .then(() => {
-                    logToMain('info', 'AudioContext resumed successfully');
-                })
-                .catch(err => {
-                    logToMain('error', 'Failed to resume AudioContext:', err.message);
-                });
+    // Process audio in chunks
+    while (audioBuffer.length >= samplesPerChunk) {
+      const chunk = audioBuffer.splice(0, samplesPerChunk);
+      const pcmData16 = convertFloat32ToInt16(chunk);
+      const base64Data = arrayBufferToBase64(pcmData16.buffer);
+
+      await ipcRenderer.invoke("send-audio-content", {
+        data: base64Data,
+        mimeType: "audio/pcm;rate=24000",
+      });
+    }
+  };
+
+  source.connect(audioProcessor);
+  audioProcessor.connect(audioContext.destination);
+}
+
+async function captureScreenshot(imageQuality = "medium", isManual = false) {
+  console.log(`Capturing ${isManual ? "manual" : "automated"} screenshot...`);
+  if (!mediaStream) return;
+
+  // Lazy init of video element
+  if (!hiddenVideo) {
+    hiddenVideo = document.createElement("video");
+    hiddenVideo.srcObject = mediaStream;
+    hiddenVideo.muted = true;
+    hiddenVideo.playsInline = true;
+    await hiddenVideo.play();
+
+    await new Promise((resolve) => {
+      if (hiddenVideo.readyState >= 2) return resolve();
+      hiddenVideo.onloadedmetadata = () => resolve();
+    });
+
+    // Lazy init of canvas based on video dimensions
+    offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = hiddenVideo.videoWidth;
+    offscreenCanvas.height = hiddenVideo.videoHeight;
+    offscreenContext = offscreenCanvas.getContext("2d");
+  }
+
+  // Check if video is ready
+  if (hiddenVideo.readyState < 2) {
+    console.warn("Video not ready yet, skipping screenshot");
+    return;
+  }
+
+  offscreenContext.drawImage(
+    hiddenVideo,
+    0,
+    0,
+    offscreenCanvas.width,
+    offscreenCanvas.height,
+  );
+
+  // Check if image was drawn properly by sampling a pixel
+  const imageData = offscreenContext.getImageData(0, 0, 1, 1);
+  const isBlank = imageData.data.every((value, index) => {
+    // Check if all pixels are black (0,0,0) or transparent
+    return index === 3 ? true : value === 0;
+  });
+
+  if (isBlank) {
+    console.warn("Screenshot appears to be blank/black");
+  }
+
+  let qualityValue;
+  switch (imageQuality) {
+    case "high":
+      qualityValue = 0.9;
+      break;
+    case "medium":
+      qualityValue = 0.7;
+      break;
+    case "low":
+      qualityValue = 0.5;
+      break;
+    default:
+      qualityValue = 0.7; // Default to medium
+  }
+
+  offscreenCanvas.toBlob(
+    async (blob) => {
+      if (!blob) {
+        console.error("Failed to create blob from canvas");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64data = reader.result.split(",")[1];
+
+        // Validate base64 data
+        if (!base64data || base64data.length < 100) {
+          console.error("Invalid base64 data generated");
+          return;
         }
 
-        const source = audioContext.createMediaStreamSource(mediaStream);
-        audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-
-        let audioBuffer = [];
-        const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
-        let chunkCount = 0;
-        let totalSamples = 0;
-
-        audioProcessor.onaudioprocess = async e => {
-            const inputData = e.inputBuffer.getChannelData(0);
-            audioBuffer.push(...inputData);
-            totalSamples += inputData.length;
-
-            // Process audio in chunks
-            while (audioBuffer.length >= samplesPerChunk) {
-                const chunk = audioBuffer.splice(0, samplesPerChunk);
-                const pcmData16 = convertFloat32ToInt16(chunk);
-                const base64Data = arrayBufferToBase64(pcmData16.buffer);
-
-                await ipcRenderer.invoke('send-audio-content', {
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=24000',
-                });
-
-                chunkCount++;
-
-                // Log progress every 100 chunks (~10 seconds)
-                if (chunkCount === 1) {
-                    logToMain('info', 'First audio chunk sent to AI');
-                    mastermind.setStatus('Listening...');
-                } else if (chunkCount % 100 === 0) {
-                    // Calculate max amplitude to check if we're getting real audio
-                    const maxAmp = Math.max(...chunk.map(Math.abs));
-                    logToMain('info', `Audio progress: ${chunkCount} chunks, maxAmplitude: ${maxAmp.toFixed(4)}`);
-                }
-            }
-        };
-
-        source.connect(audioProcessor);
-        audioProcessor.connect(audioContext.destination);
-
-        logToMain('info', 'Windows audio processing pipeline connected');
-    } catch (err) {
-        logToMain('error', 'Error setting up Windows audio:', err.message, err.stack);
-        mastermind.setStatus('Audio error: ' + err.message);
-    }
-}
-
-async function captureScreenshot(imageQuality = 'medium', isManual = false) {
-    console.log(`Capturing ${isManual ? 'manual' : 'automated'} screenshot...`);
-    if (!mediaStream) return;
-
-    // Lazy init of video element
-    if (!hiddenVideo) {
-        hiddenVideo = document.createElement('video');
-        hiddenVideo.srcObject = mediaStream;
-        hiddenVideo.muted = true;
-        hiddenVideo.playsInline = true;
-        await hiddenVideo.play();
-
-        await new Promise(resolve => {
-            if (hiddenVideo.readyState >= 2) return resolve();
-            hiddenVideo.onloadedmetadata = () => resolve();
+        const result = await ipcRenderer.invoke("send-image-content", {
+          data: base64data,
         });
 
-        // Lazy init of canvas based on video dimensions
-        offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = hiddenVideo.videoWidth;
-        offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
-    }
-
-    // Check if video is ready
-    if (hiddenVideo.readyState < 2) {
-        console.warn('Video not ready yet, skipping screenshot');
-        return;
-    }
-
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-
-    // Check if image was drawn properly by sampling a pixel
-    const imageData = offscreenContext.getImageData(0, 0, 1, 1);
-    const isBlank = imageData.data.every((value, index) => {
-        // Check if all pixels are black (0,0,0) or transparent
-        return index === 3 ? true : value === 0;
-    });
-
-    if (isBlank) {
-        console.warn('Screenshot appears to be blank/black');
-    }
-
-    let qualityValue;
-    switch (imageQuality) {
-        case 'high':
-            qualityValue = 0.9;
-            break;
-        case 'medium':
-            qualityValue = 0.7;
-            break;
-        case 'low':
-            qualityValue = 0.5;
-            break;
-        default:
-            qualityValue = 0.7; // Default to medium
-    }
-
-    offscreenCanvas.toBlob(
-        async blob => {
-            if (!blob) {
-                console.error('Failed to create blob from canvas');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-
-                // Validate base64 data
-                if (!base64data || base64data.length < 100) {
-                    console.error('Invalid base64 data generated');
-                    return;
-                }
-
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                });
-
-                if (result.success) {
-                    console.log(`Image sent successfully (${offscreenCanvas.width}x${offscreenCanvas.height})`);
-                } else {
-                    console.error('Failed to send image:', result.error);
-                }
-            };
-            reader.readAsDataURL(blob);
-        },
-        'image/jpeg',
-        qualityValue
-    );
+        if (result.success) {
+          console.log(
+            `Image sent successfully (${offscreenCanvas.width}x${offscreenCanvas.height})`,
+          );
+        } else {
+          console.error("Failed to send image:", result.error);
+        }
+      };
+      reader.readAsDataURL(blob);
+    },
+    "image/jpeg",
+    qualityValue,
+  );
 }
 
-const MANUAL_SCREENSHOT_PROMPT = `You are an expert AI assistant analyzing a screenshot. Your task is to understand what the user needs help with and provide the most useful response.
-
-**ANALYSIS APPROACH:**
-1. First, identify what's shown on the screen (code editor, math problem, website, document, exam, etc.)
-2. Determine what the user likely needs (explanation, solution, answer, debugging help, etc.)
-3. Provide a direct, actionable response
-
-**RESPONSE GUIDELINES BY CONTEXT:**
-
-**If it's CODE (LeetCode, HackerRank, coding interview, IDE):**
-- Identify the programming language and problem type
-- Provide a brief explanation of the approach (2-3 bullet points max)
-- Give the complete, working code solution
-- Include time/space complexity if relevant
-- If there's an error, explain the fix
-
-**If it's MATH or SCIENCE:**
-- Show step-by-step solution
-- Use proper mathematical notation with LaTeX ($..$ for inline, $$...$$ for blocks)
-- Provide the final answer clearly marked
-- Include any relevant formulas used
-
-**If it's MCQ/EXAM/QUIZ:**
-- State the correct answer immediately and clearly (e.g., "**Answer: B**")
-- Provide brief justification (1-2 sentences)
-- If multiple questions visible, answer all of them
-
-**If it's a DOCUMENT/ARTICLE/WEBSITE:**
-- Summarize the key information
-- Answer any specific questions if apparent
-- Highlight important points
-
-**If it's a FORM/APPLICATION:**
-- Help fill in the required information
-- Suggest appropriate responses
-- Point out any issues or missing fields
-
-**If it's an ERROR/DEBUG scenario:**
-- Identify the error type and cause
-- Provide the fix immediately
-- Explain briefly why it occurred
-
-**FORMAT REQUIREMENTS:**
-- Use **markdown** for formatting
-- Use **bold** for key answers and important points
-- Use code blocks with language specification for code
-- Be concise but complete - no unnecessary explanations
-- No pleasantries or filler text - get straight to the answer
-
-**CRITICAL:** Provide the complete answer. Don't ask for clarification - make reasonable assumptions and deliver value immediately.`;
-
-// ============ REGION SELECTION ============
-// Uses a separate fullscreen window to allow selection outside the app window
-
-async function startRegionSelection() {
-    console.log('Starting region selection...');
-
-    if (!mediaStream) {
-        console.error('No media stream available. Please start capture first.');
-        mastermind?.addNewResponse('Please start screen capture first before selecting a region.');
-        return;
-    }
-
-    // Ensure video is ready
-    if (!hiddenVideo) {
-        hiddenVideo = document.createElement('video');
-        hiddenVideo.srcObject = mediaStream;
-        hiddenVideo.muted = true;
-        hiddenVideo.playsInline = true;
-        await hiddenVideo.play();
-
-        await new Promise(resolve => {
-            if (hiddenVideo.readyState >= 2) return resolve();
-            hiddenVideo.onloadedmetadata = () => resolve();
-        });
-
-        // Initialize canvas
-        offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = hiddenVideo.videoWidth;
-        offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
-    }
-
-    if (hiddenVideo.readyState < 2) {
-        console.warn('Video not ready yet');
-        return;
-    }
-
-    // Capture current screen to show in selection window
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-    const screenshotDataUrl = offscreenCanvas.toDataURL('image/jpeg', 0.9);
-
-    // Request main process to create selection window
-    const result = await ipcRenderer.invoke('start-region-selection', { screenshotDataUrl });
-
-    if (result.success && result.rect) {
-        // Capture the selected region from the screenshot
-        await captureRegionFromScreenshot(result.rect, screenshotDataUrl);
-    } else if (result.cancelled) {
-        console.log('Region selection cancelled');
-    } else if (result.error) {
-        console.error('Region selection error:', result.error);
-    }
-}
-
-async function captureRegionFromScreenshot(rect, screenshotDataUrl) {
-    console.log('Capturing region from screenshot:', rect);
-
-    // Load the screenshot into an image
-    const img = new Image();
-    img.src = screenshotDataUrl;
-
-    await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-    });
-
-    // Calculate scale factor (screenshot might have different resolution than display)
-    // The selection coordinates are in screen pixels, we need to map to image pixels
-    const scaleX = img.naturalWidth / window.screen.width;
-    const scaleY = img.naturalHeight / window.screen.height;
-
-    // Scale the selection rectangle
-    const scaledRect = {
-        left: Math.round(rect.left * scaleX),
-        top: Math.round(rect.top * scaleY),
-        width: Math.round(rect.width * scaleX),
-        height: Math.round(rect.height * scaleY),
-    };
-
-    // Create canvas for the cropped region
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = scaledRect.width;
-    cropCanvas.height = scaledRect.height;
-    const cropContext = cropCanvas.getContext('2d');
-
-    // Draw only the selected region
-    cropContext.drawImage(img, scaledRect.left, scaledRect.top, scaledRect.width, scaledRect.height, 0, 0, scaledRect.width, scaledRect.height);
-
-    // Convert to blob and send
-    cropCanvas.toBlob(
-        async blob => {
-            if (!blob) {
-                console.error('Failed to create blob from cropped region');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-
-                if (!base64data || base64data.length < 100) {
-                    console.error('Invalid base64 data generated');
-                    return;
-                }
-
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                    prompt: MANUAL_SCREENSHOT_PROMPT,
-                });
-
-                if (result.success) {
-                    console.log(`Region capture response completed from ${result.model}`);
-                } else {
-                    console.error('Failed to get region capture response:', result.error);
-                    mastermind.addNewResponse(`Error: ${result.error}`);
-                }
-            };
-            reader.readAsDataURL(blob);
-        },
-        'image/jpeg',
-        0.9
-    );
-}
-
-// Expose to global scope
-window.startRegionSelection = startRegionSelection;
+const MANUAL_SCREENSHOT_PROMPT = `Analyze this screen and help me. Give me the answer directly, no BS.
+- If it's a coding problem, algorithm challenge, or live coding exercise: provide 2-3 bullet approach points, then the COMPLETE WORKING CODE with comments. Never say "open your IDE" — give the actual code.
+- If it's a question about the website content, give me the direct answer.
+- If it's a multiple choice question, give me the correct answer with brief justification.
+- If there's anything else important on screen, tell me.`;
 
 async function captureManualScreenshot(imageQuality = null) {
-    console.log('Manual screenshot triggered');
-    const quality = imageQuality || currentImageQuality;
+  console.log("Manual screenshot triggered");
+  const quality = imageQuality || currentImageQuality;
 
-    if (!mediaStream) {
-        console.error('No media stream available');
+  if (!mediaStream) {
+    console.error("No media stream available");
+    return;
+  }
+
+  // Lazy init of video element
+  if (!hiddenVideo) {
+    hiddenVideo = document.createElement("video");
+    hiddenVideo.srcObject = mediaStream;
+    hiddenVideo.muted = true;
+    hiddenVideo.playsInline = true;
+    await hiddenVideo.play();
+
+    await new Promise((resolve) => {
+      if (hiddenVideo.readyState >= 2) return resolve();
+      hiddenVideo.onloadedmetadata = () => resolve();
+    });
+
+    // Lazy init of canvas based on video dimensions
+    offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = hiddenVideo.videoWidth;
+    offscreenCanvas.height = hiddenVideo.videoHeight;
+    offscreenContext = offscreenCanvas.getContext("2d");
+  }
+
+  // Check if video is ready
+  if (hiddenVideo.readyState < 2) {
+    console.warn("Video not ready yet, skipping screenshot");
+    return;
+  }
+
+  // Downscale to max 1280px wide for faster transfer — vision models don't need 4K
+  const MAX_WIDTH = 1280;
+  const srcW = hiddenVideo.videoWidth;
+  const srcH = hiddenVideo.videoHeight;
+  let destW = srcW;
+  let destH = srcH;
+  if (srcW > MAX_WIDTH) {
+    destW = MAX_WIDTH;
+    destH = Math.round(srcH * (MAX_WIDTH / srcW));
+  }
+  offscreenCanvas.width = destW;
+  offscreenCanvas.height = destH;
+  offscreenContext.drawImage(hiddenVideo, 0, 0, destW, destH);
+
+  let qualityValue;
+  switch (quality) {
+    case "high":
+      qualityValue = 0.85;
+      break;
+    case "medium":
+      qualityValue = 0.6;
+      break;
+    case "low":
+      qualityValue = 0.4;
+      break;
+    default:
+      qualityValue = 0.6;
+  }
+
+  offscreenCanvas.toBlob(
+    async (blob) => {
+      if (!blob) {
+        console.error("Failed to create blob from canvas");
         return;
-    }
+      }
 
-    // Lazy init of video element
-    if (!hiddenVideo) {
-        hiddenVideo = document.createElement('video');
-        hiddenVideo.srcObject = mediaStream;
-        hiddenVideo.muted = true;
-        hiddenVideo.playsInline = true;
-        await hiddenVideo.play();
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64data = reader.result.split(",")[1];
 
-        await new Promise(resolve => {
-            if (hiddenVideo.readyState >= 2) return resolve();
-            hiddenVideo.onloadedmetadata = () => resolve();
+        if (!base64data || base64data.length < 100) {
+          console.error("Invalid base64 data generated");
+          return;
+        }
+
+        console.log(
+          `Sending image: ${destW}x${destH}, ~${Math.round(base64data.length / 1024)}KB`,
+        );
+
+        // Send image with prompt to HTTP API (response streams via IPC events)
+        const result = await ipcRenderer.invoke("send-image-content", {
+          data: base64data,
+          prompt: MANUAL_SCREENSHOT_PROMPT,
         });
 
-        // Lazy init of canvas based on video dimensions
-        offscreenCanvas = document.createElement('canvas');
-        offscreenCanvas.width = hiddenVideo.videoWidth;
-        offscreenCanvas.height = hiddenVideo.videoHeight;
-        offscreenContext = offscreenCanvas.getContext('2d');
-    }
-
-    // Check if video is ready
-    if (hiddenVideo.readyState < 2) {
-        console.warn('Video not ready yet, skipping screenshot');
-        return;
-    }
-
-    offscreenContext.drawImage(hiddenVideo, 0, 0, offscreenCanvas.width, offscreenCanvas.height);
-
-    let qualityValue;
-    switch (quality) {
-        case 'high':
-            qualityValue = 0.9;
-            break;
-        case 'medium':
-            qualityValue = 0.7;
-            break;
-        case 'low':
-            qualityValue = 0.5;
-            break;
-        default:
-            qualityValue = 0.7;
-    }
-
-    offscreenCanvas.toBlob(
-        async blob => {
-            if (!blob) {
-                console.error('Failed to create blob from canvas');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64data = reader.result.split(',')[1];
-
-                if (!base64data || base64data.length < 100) {
-                    console.error('Invalid base64 data generated');
-                    return;
-                }
-
-                // Send image with prompt to HTTP API (response streams via IPC events)
-                const result = await ipcRenderer.invoke('send-image-content', {
-                    data: base64data,
-                    prompt: MANUAL_SCREENSHOT_PROMPT,
-                });
-
-                if (result.success) {
-                    console.log(`Image response completed from ${result.model}`);
-                    // Response already displayed via streaming events (new-response/update-response)
-                } else {
-                    console.error('Failed to get image response:', result.error);
-                    mastermind.addNewResponse(`Error: ${result.error}`);
-                }
-            };
-            reader.readAsDataURL(blob);
-        },
-        'image/jpeg',
-        qualityValue
-    );
+        if (result.success) {
+          console.log(`Image response completed from ${result.model}`);
+          // Response already displayed via streaming events (new-response/update-response)
+        } else {
+          console.error("Failed to get image response:", result.error);
+          cheatingDaddy.addNewResponse(`Error: ${result.error}`);
+        }
+      };
+      reader.readAsDataURL(blob);
+    },
+    "image/jpeg",
+    qualityValue,
+  );
 }
 
 // Expose functions to global scope for external access
 window.captureManualScreenshot = captureManualScreenshot;
 
 function stopCapture() {
-    if (screenshotInterval) {
-        clearInterval(screenshotInterval);
-        screenshotInterval = null;
-    }
+  if (screenshotInterval) {
+    clearInterval(screenshotInterval);
+    screenshotInterval = null;
+  }
 
-    if (audioProcessor) {
-        audioProcessor.disconnect();
-        audioProcessor = null;
-    }
+  if (audioProcessor) {
+    audioProcessor.disconnect();
+    audioProcessor = null;
+  }
 
-    // Clean up microphone audio processor (Linux only)
-    if (micAudioProcessor) {
-        micAudioProcessor.disconnect();
-        micAudioProcessor = null;
-    }
+  // Clean up microphone audio processor (Linux only)
+  if (micAudioProcessor) {
+    micAudioProcessor.disconnect();
+    micAudioProcessor = null;
+  }
 
-    if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-    }
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+  }
 
-    if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
-        mediaStream = null;
-    }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
 
-    // Stop macOS audio capture if running
-    if (isMacOS) {
-        ipcRenderer.invoke('stop-macos-audio').catch(err => {
-            console.error('Error stopping macOS audio:', err);
-        });
-    }
+  // Stop macOS audio capture if running
+  if (isMacOS) {
+    ipcRenderer.invoke("stop-macos-audio").catch((err) => {
+      console.error("Error stopping macOS audio:", err);
+    });
+  }
 
-    // Clean up hidden elements
-    if (hiddenVideo) {
-        hiddenVideo.pause();
-        hiddenVideo.srcObject = null;
-        hiddenVideo = null;
-    }
-    offscreenCanvas = null;
-    offscreenContext = null;
+  // Clean up hidden elements
+  if (hiddenVideo) {
+    hiddenVideo.pause();
+    hiddenVideo.srcObject = null;
+    hiddenVideo = null;
+  }
+  offscreenCanvas = null;
+  offscreenContext = null;
 }
 
 // Send text message to Gemini
 async function sendTextMessage(text) {
-    if (!text || text.trim().length === 0) {
-        console.warn('Cannot send empty text message');
-        return { success: false, error: 'Empty message' };
-    }
+  if (!text || text.trim().length === 0) {
+    console.warn("Cannot send empty text message");
+    return { success: false, error: "Empty message" };
+  }
 
-    try {
-        const result = await ipcRenderer.invoke('send-text-message', text);
-        if (result.success) {
-            console.log('Text message sent successfully');
-        } else {
-            console.error('Failed to send text message:', result.error);
-        }
-        return result;
-    } catch (error) {
-        console.error('Error sending text message:', error);
-        return { success: false, error: error.message };
+  try {
+    const result = await ipcRenderer.invoke("send-text-message", text);
+    if (result.success) {
+      console.log("Text message sent successfully");
+    } else {
+      console.error("Failed to send text message:", result.error);
     }
+    return result;
+  } catch (error) {
+    console.error("Error sending text message:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Expand the last response — continues the conversation with a detailed version
+async function expandLastResponse() {
+  const app = cheatingDaddyApp;
+  if (!app || app.responses.length === 0 || app.currentResponseIndex < 0) {
+    console.warn("No response to expand");
+    return { success: false, error: "No response to expand" };
+  }
+
+  const previousResponse = app.responses[app.currentResponseIndex];
+  if (!previousResponse || previousResponse.trim().length === 0) {
+    console.warn("Current response is empty");
+    return { success: false, error: "Current response is empty" };
+  }
+
+  try {
+    const result = await ipcRenderer.invoke("expand-last-response", {
+      previousResponse: previousResponse,
+      originalContext: "",
+    });
+
+    if (result.success) {
+      console.log("Expand request sent successfully");
+    } else {
+      console.error("Failed to expand response:", result.error);
+    }
+    return result;
+  } catch (error) {
+    console.error("Error expanding response:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 // Listen for conversation data from main process and save to storage
-ipcRenderer.on('save-conversation-turn', async (event, data) => {
-    try {
-        await storage.saveSession(data.sessionId, { conversationHistory: data.fullHistory });
-        console.log('Conversation session saved:', data.sessionId);
-    } catch (error) {
-        console.error('Error saving conversation session:', error);
-    }
+ipcRenderer.on("save-conversation-turn", async (event, data) => {
+  try {
+    await storage.saveSession(data.sessionId, {
+      conversationHistory: data.fullHistory,
+    });
+    console.log("Conversation session saved:", data.sessionId);
+  } catch (error) {
+    console.error("Error saving conversation session:", error);
+  }
 });
 
 // Listen for session context (profile info) when session starts
-ipcRenderer.on('save-session-context', async (event, data) => {
-    try {
-        await storage.saveSession(data.sessionId, {
-            profile: data.profile,
-            customPrompt: data.customPrompt,
-        });
-        console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
-    } catch (error) {
-        console.error('Error saving session context:', error);
-    }
+ipcRenderer.on("save-session-context", async (event, data) => {
+  try {
+    await storage.saveSession(data.sessionId, {
+      profile: data.profile,
+      customPrompt: data.customPrompt,
+    });
+    console.log(
+      "Session context saved:",
+      data.sessionId,
+      "profile:",
+      data.profile,
+    );
+  } catch (error) {
+    console.error("Error saving session context:", error);
+  }
 });
 
 // Listen for screen analysis responses (from ctrl+enter)
-ipcRenderer.on('save-screen-analysis', async (event, data) => {
-    try {
-        await storage.saveSession(data.sessionId, {
-            screenAnalysisHistory: data.fullHistory,
-            profile: data.profile,
-            customPrompt: data.customPrompt,
-        });
-        console.log('Screen analysis saved:', data.sessionId);
-    } catch (error) {
-        console.error('Error saving screen analysis:', error);
-    }
+ipcRenderer.on("save-screen-analysis", async (event, data) => {
+  try {
+    await storage.saveSession(data.sessionId, {
+      screenAnalysisHistory: data.fullHistory,
+      profile: data.profile,
+      customPrompt: data.customPrompt,
+    });
+    console.log("Screen analysis saved:", data.sessionId);
+  } catch (error) {
+    console.error("Error saving screen analysis:", error);
+  }
 });
 
 // Listen for emergency erase command from main process
-ipcRenderer.on('clear-sensitive-data', async () => {
-    console.log('Clearing all data...');
-    await storage.clearAll();
+ipcRenderer.on("clear-sensitive-data", async () => {
+  console.log("Clearing all data...");
+  await storage.clearAll();
 });
 
 // Handle shortcuts based on current view
 function handleShortcut(shortcutKey) {
-    const currentView = mastermind.getCurrentView();
+  const currentView = cheatingDaddy.getCurrentView();
 
-    if (shortcutKey === 'ctrl+enter' || shortcutKey === 'cmd+enter') {
-        if (currentView === 'main') {
-            mastermind.element().handleStart();
-        } else {
-            captureManualScreenshot();
-        }
+  if (shortcutKey === "ctrl+enter" || shortcutKey === "cmd+enter") {
+    if (currentView === "main") {
+      cheatingDaddy.element().handleStart();
+    } else {
+      captureManualScreenshot();
     }
+  }
 }
 
 // Create reference to the main app element
-const mastermindApp = document.querySelector('mastermind-app');
+const cheatingDaddyApp = document.querySelector("cheating-daddy-app");
 
 // ============ THEME SYSTEM ============
 const theme = {
-    themes: {
-        dark: {
-            background: '#1e1e1e',
-            text: '#e0e0e0',
-            textSecondary: '#a0a0a0',
-            textMuted: '#6b6b6b',
-            border: '#333333',
-            accent: '#ffffff',
-            btnPrimaryBg: '#ffffff',
-            btnPrimaryText: '#000000',
-            btnPrimaryHover: '#e0e0e0',
-            tooltipBg: '#1a1a1a',
-            tooltipText: '#ffffff',
-            keyBg: 'rgba(255,255,255,0.1)',
-        },
-        light: {
-            background: '#ffffff',
-            text: '#1a1a1a',
-            textSecondary: '#555555',
-            textMuted: '#888888',
-            border: '#e0e0e0',
-            accent: '#000000',
-            btnPrimaryBg: '#1a1a1a',
-            btnPrimaryText: '#ffffff',
-            btnPrimaryHover: '#333333',
-            tooltipBg: '#1a1a1a',
-            tooltipText: '#ffffff',
-            keyBg: 'rgba(0,0,0,0.1)',
-        },
-        midnight: {
-            background: '#0d1117',
-            text: '#c9d1d9',
-            textSecondary: '#8b949e',
-            textMuted: '#6e7681',
-            border: '#30363d',
-            accent: '#58a6ff',
-            btnPrimaryBg: '#58a6ff',
-            btnPrimaryText: '#0d1117',
-            btnPrimaryHover: '#79b8ff',
-            tooltipBg: '#161b22',
-            tooltipText: '#c9d1d9',
-            keyBg: 'rgba(88,166,255,0.15)',
-        },
-        sepia: {
-            background: '#f4ecd8',
-            text: '#5c4b37',
-            textSecondary: '#7a6a56',
-            textMuted: '#998875',
-            border: '#d4c8b0',
-            accent: '#8b4513',
-            btnPrimaryBg: '#5c4b37',
-            btnPrimaryText: '#f4ecd8',
-            btnPrimaryHover: '#7a6a56',
-            tooltipBg: '#5c4b37',
-            tooltipText: '#f4ecd8',
-            keyBg: 'rgba(92,75,55,0.15)',
-        },
-        nord: {
-            background: '#2e3440',
-            text: '#eceff4',
-            textSecondary: '#d8dee9',
-            textMuted: '#4c566a',
-            border: '#3b4252',
-            accent: '#88c0d0',
-            btnPrimaryBg: '#88c0d0',
-            btnPrimaryText: '#2e3440',
-            btnPrimaryHover: '#8fbcbb',
-            tooltipBg: '#3b4252',
-            tooltipText: '#eceff4',
-            keyBg: 'rgba(136,192,208,0.15)',
-        },
-        dracula: {
-            background: '#282a36',
-            text: '#f8f8f2',
-            textSecondary: '#bd93f9',
-            textMuted: '#6272a4',
-            border: '#44475a',
-            accent: '#ff79c6',
-            btnPrimaryBg: '#ff79c6',
-            btnPrimaryText: '#282a36',
-            btnPrimaryHover: '#ff92d0',
-            tooltipBg: '#44475a',
-            tooltipText: '#f8f8f2',
-            keyBg: 'rgba(255,121,198,0.15)',
-        },
-        abyss: {
-            background: '#0a0a0a',
-            text: '#d4d4d4',
-            textSecondary: '#808080',
-            textMuted: '#505050',
-            border: '#1a1a1a',
-            accent: '#ffffff',
-            btnPrimaryBg: '#ffffff',
-            btnPrimaryText: '#0a0a0a',
-            btnPrimaryHover: '#d4d4d4',
-            tooltipBg: '#141414',
-            tooltipText: '#d4d4d4',
-            keyBg: 'rgba(255,255,255,0.08)',
-        },
+  themes: {
+    dark: {
+      background: "#101010",
+      text: "#e0e0e0",
+      textSecondary: "#a0a0a0",
+      textMuted: "#6b6b6b",
+      border: "#2a2a2a",
+      accent: "#ffffff",
+      btnPrimaryBg: "#ffffff",
+      btnPrimaryText: "#000000",
+      btnPrimaryHover: "#e0e0e0",
+      tooltipBg: "#1a1a1a",
+      tooltipText: "#ffffff",
+      keyBg: "rgba(255,255,255,0.1)",
     },
-
-    current: 'dark',
-
-    get(name) {
-        return this.themes[name] || this.themes.dark;
+    light: {
+      background: "#ffffff",
+      text: "#1a1a1a",
+      textSecondary: "#555555",
+      textMuted: "#888888",
+      border: "#e0e0e0",
+      accent: "#000000",
+      btnPrimaryBg: "#1a1a1a",
+      btnPrimaryText: "#ffffff",
+      btnPrimaryHover: "#333333",
+      tooltipBg: "#1a1a1a",
+      tooltipText: "#ffffff",
+      keyBg: "rgba(0,0,0,0.1)",
     },
-
-    getAll() {
-        const names = {
-            dark: 'Dark',
-            light: 'Light',
-            midnight: 'Midnight Blue',
-            sepia: 'Sepia',
-            nord: 'Nord',
-            dracula: 'Dracula',
-            abyss: 'Abyss',
-        };
-        return Object.keys(this.themes).map(key => ({
-            value: key,
-            name: names[key] || key,
-            colors: this.themes[key],
-        }));
+    midnight: {
+      background: "#0d1117",
+      text: "#c9d1d9",
+      textSecondary: "#8b949e",
+      textMuted: "#6e7681",
+      border: "#30363d",
+      accent: "#58a6ff",
+      btnPrimaryBg: "#58a6ff",
+      btnPrimaryText: "#0d1117",
+      btnPrimaryHover: "#79b8ff",
+      tooltipBg: "#161b22",
+      tooltipText: "#c9d1d9",
+      keyBg: "rgba(88,166,255,0.15)",
     },
-
-    hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result
-            ? {
-                  r: parseInt(result[1], 16),
-                  g: parseInt(result[2], 16),
-                  b: parseInt(result[3], 16),
-              }
-            : { r: 30, g: 30, b: 30 };
+    sepia: {
+      background: "#f4ecd8",
+      text: "#5c4b37",
+      textSecondary: "#7a6a56",
+      textMuted: "#998875",
+      border: "#d4c8b0",
+      accent: "#8b4513",
+      btnPrimaryBg: "#5c4b37",
+      btnPrimaryText: "#f4ecd8",
+      btnPrimaryHover: "#7a6a56",
+      tooltipBg: "#5c4b37",
+      tooltipText: "#f4ecd8",
+      keyBg: "rgba(92,75,55,0.15)",
     },
-
-    lightenColor(rgb, amount) {
-        return {
-            r: Math.min(255, rgb.r + amount),
-            g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount),
-        };
+    catppuccin: {
+      background: "#1e1e2e",
+      text: "#cdd6f4",
+      textSecondary: "#a6adc8",
+      textMuted: "#585b70",
+      border: "#313244",
+      accent: "#cba6f7",
+      btnPrimaryBg: "#cba6f7",
+      btnPrimaryText: "#1e1e2e",
+      btnPrimaryHover: "#b4befe",
+      tooltipBg: "#313244",
+      tooltipText: "#cdd6f4",
+      keyBg: "rgba(203,166,247,0.12)",
     },
-
-    darkenColor(rgb, amount) {
-        return {
-            r: Math.max(0, rgb.r - amount),
-            g: Math.max(0, rgb.g - amount),
-            b: Math.max(0, rgb.b - amount),
-        };
+    gruvbox: {
+      background: "#1d2021",
+      text: "#ebdbb2",
+      textSecondary: "#a89984",
+      textMuted: "#665c54",
+      border: "#3c3836",
+      accent: "#fe8019",
+      btnPrimaryBg: "#fe8019",
+      btnPrimaryText: "#1d2021",
+      btnPrimaryHover: "#fabd2f",
+      tooltipBg: "#3c3836",
+      tooltipText: "#ebdbb2",
+      keyBg: "rgba(254,128,25,0.12)",
     },
-
-    applyBackgrounds(backgroundColor, alpha = 0.8) {
-        const root = document.documentElement;
-        const baseRgb = this.hexToRgb(backgroundColor);
-
-        // For light themes, darken; for dark themes, lighten
-        const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
-        const adjust = isLight ? this.darkenColor.bind(this) : this.lightenColor.bind(this);
-
-        const secondary = adjust(baseRgb, 7);
-        const tertiary = adjust(baseRgb, 15);
-        const hover = adjust(baseRgb, 20);
-
-        root.style.setProperty('--header-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--main-content-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-primary', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--bg-secondary', `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`);
-        root.style.setProperty('--bg-tertiary', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--bg-hover', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--input-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
-        root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
-        root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+    rosepine: {
+      background: "#191724",
+      text: "#e0def4",
+      textSecondary: "#908caa",
+      textMuted: "#6e6a86",
+      border: "#26233a",
+      accent: "#ebbcba",
+      btnPrimaryBg: "#ebbcba",
+      btnPrimaryText: "#191724",
+      btnPrimaryHover: "#f6c177",
+      tooltipBg: "#26233a",
+      tooltipText: "#e0def4",
+      keyBg: "rgba(235,188,186,0.12)",
     },
-
-    apply(themeName, alpha = 0.8) {
-        const colors = this.get(themeName);
-        this.current = themeName;
-        const root = document.documentElement;
-
-        // Text colors
-        root.style.setProperty('--text-color', colors.text);
-        root.style.setProperty('--text-secondary', colors.textSecondary);
-        root.style.setProperty('--text-muted', colors.textMuted);
-        // Border colors
-        root.style.setProperty('--border-color', colors.border);
-        root.style.setProperty('--border-default', colors.accent);
-        // Misc
-        root.style.setProperty('--placeholder-color', colors.textMuted);
-        root.style.setProperty('--scrollbar-thumb', colors.border);
-        root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);
-        root.style.setProperty('--key-background', colors.keyBg);
-        // Primary button
-        root.style.setProperty('--btn-primary-bg', colors.btnPrimaryBg);
-        root.style.setProperty('--btn-primary-text', colors.btnPrimaryText);
-        root.style.setProperty('--btn-primary-hover', colors.btnPrimaryHover);
-        // Start button (same as primary)
-        root.style.setProperty('--start-button-background', colors.btnPrimaryBg);
-        root.style.setProperty('--start-button-color', colors.btnPrimaryText);
-        root.style.setProperty('--start-button-hover-background', colors.btnPrimaryHover);
-        // Tooltip
-        root.style.setProperty('--tooltip-bg', colors.tooltipBg);
-        root.style.setProperty('--tooltip-text', colors.tooltipText);
-        // Error color (stays constant)
-        root.style.setProperty('--error-color', '#f14c4c');
-        root.style.setProperty('--success-color', '#4caf50');
-
-        // Also apply background colors from theme
-        this.applyBackgrounds(colors.background, alpha);
+    solarized: {
+      background: "#002b36",
+      text: "#93a1a1",
+      textSecondary: "#839496",
+      textMuted: "#586e75",
+      border: "#073642",
+      accent: "#2aa198",
+      btnPrimaryBg: "#2aa198",
+      btnPrimaryText: "#002b36",
+      btnPrimaryHover: "#268bd2",
+      tooltipBg: "#073642",
+      tooltipText: "#93a1a1",
+      keyBg: "rgba(42,161,152,0.12)",
     },
+    tokyonight: {
+      background: "#1a1b26",
+      text: "#c0caf5",
+      textSecondary: "#9aa5ce",
+      textMuted: "#565f89",
+      border: "#292e42",
+      accent: "#7aa2f7",
+      btnPrimaryBg: "#7aa2f7",
+      btnPrimaryText: "#1a1b26",
+      btnPrimaryHover: "#bb9af7",
+      tooltipBg: "#292e42",
+      tooltipText: "#c0caf5",
+      keyBg: "rgba(122,162,247,0.12)",
+    },
+  },
 
-    async load() {
-        try {
-            const prefs = await storage.getPreferences();
-            const themeName = prefs.theme || 'dark';
-            const alpha = prefs.backgroundTransparency ?? 0.8;
-            this.apply(themeName, alpha);
-            return themeName;
-        } catch (err) {
-            this.apply('dark');
-            return 'dark';
+  current: "dark",
+
+  get(name) {
+    return this.themes[name] || this.themes.dark;
+  },
+
+  getAll() {
+    const names = {
+      dark: "Dark",
+      light: "Light",
+      midnight: "Midnight Blue",
+      sepia: "Sepia",
+      catppuccin: "Catppuccin Mocha",
+      gruvbox: "Gruvbox Dark",
+      rosepine: "Ros\u00e9 Pine",
+      solarized: "Solarized Dark",
+      tokyonight: "Tokyo Night",
+    };
+    return Object.keys(this.themes).map((key) => ({
+      value: key,
+      name: names[key] || key,
+      colors: this.themes[key],
+    }));
+  },
+
+  hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16),
         }
-    },
+      : { r: 30, g: 30, b: 30 };
+  },
 
-    async save(themeName) {
-        await storage.updatePreference('theme', themeName);
-        this.apply(themeName);
-    },
+  lightenColor(rgb, amount) {
+    return {
+      r: Math.min(255, rgb.r + amount),
+      g: Math.min(255, rgb.g + amount),
+      b: Math.min(255, rgb.b + amount),
+    };
+  },
+
+  darkenColor(rgb, amount) {
+    return {
+      r: Math.max(0, rgb.r - amount),
+      g: Math.max(0, rgb.g - amount),
+      b: Math.max(0, rgb.b - amount),
+    };
+  },
+
+  applyBackgrounds(backgroundColor, alpha = 0.8) {
+    const root = document.documentElement;
+    const baseRgb = this.hexToRgb(backgroundColor);
+
+    // For light themes, darken; for dark themes, lighten
+    const isLight = (baseRgb.r + baseRgb.g + baseRgb.b) / 3 > 128;
+    const adjust = isLight
+      ? this.darkenColor.bind(this)
+      : this.lightenColor.bind(this);
+
+    const secondary = adjust(baseRgb, 10);
+    const tertiary = adjust(baseRgb, 22);
+    const hover = adjust(baseRgb, 28);
+
+    const bgBase = `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`;
+    const bgSurface = `rgba(${secondary.r}, ${secondary.g}, ${secondary.b}, ${alpha})`;
+    const bgElevated = `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`;
+    const bgHover = `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`;
+
+    // New design tokens (used by components)
+    root.style.setProperty("--bg-app", bgBase);
+    root.style.setProperty("--bg-surface", bgSurface);
+    root.style.setProperty("--bg-elevated", bgElevated);
+    root.style.setProperty("--bg-hover", bgHover);
+
+    // Legacy aliases
+    root.style.setProperty("--header-background", bgBase);
+    root.style.setProperty("--main-content-background", bgBase);
+    root.style.setProperty("--bg-primary", bgBase);
+    root.style.setProperty("--bg-secondary", bgSurface);
+    root.style.setProperty("--bg-tertiary", bgElevated);
+    root.style.setProperty("--input-background", bgElevated);
+    root.style.setProperty("--input-focus-background", bgElevated);
+    root.style.setProperty("--hover-background", bgHover);
+    root.style.setProperty("--scrollbar-background", bgBase);
+  },
+
+  apply(themeName, alpha = 0.8) {
+    const colors = this.get(themeName);
+    this.current = themeName;
+    const root = document.documentElement;
+
+    // Determine if theme is light or dark
+    const lightThemes = ["light", "sepia"];
+    const isLightTheme = lightThemes.includes(themeName);
+    document.body.setAttribute("data-theme-type", isLightTheme ? "light" : "dark");
+
+    // New design tokens (used by components)
+    root.style.setProperty("--text-primary", colors.text);
+    root.style.setProperty("--text-secondary", colors.textSecondary);
+    root.style.setProperty("--text-muted", colors.textMuted);
+    root.style.setProperty("--border", colors.border);
+    root.style.setProperty("--border-strong", colors.accent);
+    root.style.setProperty("--accent", colors.btnPrimaryBg);
+    root.style.setProperty("--accent-hover", colors.btnPrimaryHover);
+
+    // Legacy aliases
+    root.style.setProperty("--text-color", colors.text);
+    root.style.setProperty("--border-color", colors.border);
+    root.style.setProperty("--border-default", colors.accent);
+    root.style.setProperty("--placeholder-color", colors.textMuted);
+    root.style.setProperty("--scrollbar-thumb", colors.border);
+    root.style.setProperty("--scrollbar-thumb-hover", colors.textMuted);
+    root.style.setProperty("--key-background", colors.keyBg);
+    // Primary button
+    root.style.setProperty("--btn-primary-bg", colors.btnPrimaryBg);
+    root.style.setProperty("--btn-primary-text", colors.btnPrimaryText);
+    root.style.setProperty("--btn-primary-hover", colors.btnPrimaryHover);
+    // Start button (same as primary)
+    root.style.setProperty("--start-button-background", colors.btnPrimaryBg);
+    root.style.setProperty("--start-button-color", colors.btnPrimaryText);
+    root.style.setProperty(
+      "--start-button-hover-background",
+      colors.btnPrimaryHover,
+    );
+    // Tooltip
+    root.style.setProperty("--tooltip-bg", colors.tooltipBg);
+    root.style.setProperty("--tooltip-text", colors.tooltipText);
+    // Error color (stays constant)
+    root.style.setProperty("--error-color", "#f14c4c");
+    root.style.setProperty("--success-color", "#4caf50");
+
+    // Also apply background colors from theme
+    this.applyBackgrounds(colors.background, alpha);
+  },
+
+  async load() {
+    try {
+      const prefs = await storage.getPreferences();
+      const themeName = prefs.theme || "dark";
+      const alpha = prefs.backgroundTransparency ?? 0.8;
+      this.apply(themeName, alpha);
+      return themeName;
+    } catch (err) {
+      this.apply("dark");
+      return "dark";
+    }
+  },
+
+  async save(themeName) {
+    await storage.updatePreference("theme", themeName);
+    this.apply(themeName);
+  },
 };
 
-// Consolidated mastermind object - all functions in one place
-const mastermind = {
-    // App version
-    getVersion: async () => ipcRenderer.invoke('get-app-version'),
+// Consolidated cheatingDaddy object - all functions in one place
+const cheatingDaddy = {
+  // App version
+  getVersion: async () => ipcRenderer.invoke("get-app-version"),
 
-    // Element access
-    element: () => mastermindApp,
-    e: () => mastermindApp,
+  // Element access
+  element: () => cheatingDaddyApp,
+  e: () => cheatingDaddyApp,
 
-    // App state functions - access properties directly from the app element
-    getCurrentView: () => mastermindApp.currentView,
-    getLayoutMode: () => mastermindApp.layoutMode,
+  // App state functions - access properties directly from the app element
+  getCurrentView: () => cheatingDaddyApp.currentView,
+  getLayoutMode: () => cheatingDaddyApp.layoutMode,
 
-    // Status and response functions
-    setStatus: text => mastermindApp.setStatus(text),
-    addNewResponse: response => mastermindApp.addNewResponse(response),
-    updateCurrentResponse: response => mastermindApp.updateCurrentResponse(response),
+  // Status and response functions
+  setStatus: (text) => cheatingDaddyApp.setStatus(text),
+  addNewResponse: (response) => cheatingDaddyApp.addNewResponse(response),
+  updateCurrentResponse: (response) =>
+    cheatingDaddyApp.updateCurrentResponse(response),
 
-    // Core functionality
-    initializeGemini,
-    startCapture,
-    stopCapture,
-    sendTextMessage,
-    handleShortcut,
+  // Core functionality
+  initializeGemini,
+  initializeLocal,
+  startCapture,
+  stopCapture,
+  sendTextMessage,
+  expandLastResponse,
+  handleShortcut,
 
-    // Storage API
-    storage,
+  // Storage API
+  storage,
 
-    // Theme API
-    theme,
+  // Theme API
+  theme,
 
-    // Refresh preferences cache (call after updating preferences)
-    refreshPreferencesCache: loadPreferencesCache,
+  // Refresh preferences cache (call after updating preferences)
+  refreshPreferencesCache: loadPreferencesCache,
 
-    // Platform detection
-    isLinux: isLinux,
-    isMacOS: isMacOS,
+  // Platform detection
+  isLinux: isLinux,
+  isMacOS: isMacOS,
 };
 
 // Make it globally available
-window.mastermind = mastermind;
+window.cheatingDaddy = cheatingDaddy;
 
 // Load theme after DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => theme.load());
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => theme.load());
 } else {
-    theme.load();
+  theme.load();
 }
