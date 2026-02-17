@@ -1,7 +1,7 @@
 {
   "name": "mastermind",
   "productName": "Mastermind",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Mastermind AI assistant",
   "main": "src/index.js",
   "scripts": {
@@ -34,7 +34,6 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.7.1",
     "@electron-forge/cli": "^7.8.1",
     "@electron-forge/maker-deb": "^7.8.1",
     "@electron-forge/maker-dmg": "^7.8.1",
@@ -44,8 +43,10 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/plugin-fuses": "^7.8.1",
     "@electron/fuses": "^1.8.0",
+    "@electron/rebuild": "^3.7.1",
     "@reforged/maker-appimage": "^5.0.0",
-    "electron": "^30.0.5"
+    "electron": "^30.0.5",
+    "electron-icon-builder": "^2.0.1"
   },
   "pnpm": {
     "overrides": {
