@@ -64,6 +64,7 @@ jobs:
                       out/make/**/*.deb
                       out/make/**/*.rpm
                   if-no-files-found: ignore
+                  compression-level: 0
 
     release:
         needs: build
