@@ -48,18 +48,8 @@ module.exports = {
       name: "@electron-forge/maker-dmg",
       platforms: ["darwin"],
       config: {
-        format: "UDZO",
         icon: "src/assets/logo.icns",
-        name: "Mastermind",
-        additionalDMGOptions: {
-          window: {
-            size: {
-              width: 660,
-              height: 400,
-            },
-          },
-        },
-      },
+      }
     },
     {
       name: "@reforged/maker-appimage",
