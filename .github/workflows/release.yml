@@ -68,7 +68,7 @@ jobs:
 
     release:
         needs: build
-        runs-on: ubuntu-latest
+        runs-on: macos-latest
         if: github.server_url == 'https://github.com'
 
         permissions:
