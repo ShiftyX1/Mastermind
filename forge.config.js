@@ -50,14 +50,6 @@ module.exports = {
       config: {
         format: "UDZO",
         icon: "src/assets/logo.icns",
-        additionalDMGOptions: {
-          window: {
-            size: {
-              width: 660,
-              height: 400,
-            },
-          },
-        },
       },
     },
     {
